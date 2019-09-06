@@ -4,7 +4,7 @@
 dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
 class_file='data/classInd_'$dataset'.txt'
 training=true # true | false
-testing=false # true | false
+testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
 num_segments=5 # sample frame # of each video for training
@@ -14,7 +14,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=resnet101
-use_target=uSv # none | Sv | uSv
+use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -25,7 +25,7 @@ else
 fi
 
 #====== select dataset ======#
-path_data_root=/home/mchen2/dataset/ # depend on users
+path_data_root=dataset/ # depend on users
 path_exp_root=action-experiments/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
@@ -98,6 +98,7 @@ bS_2=$((bS * num_target / num_source ))
 echo '('$bS', '$bS_2')'
 
 lr=3e-2
+# lr=1e-4
 optimizer=SGD
 
 if [ "$use_target" == "none" ] 
@@ -141,7 +142,21 @@ then
 	gd=20
 	
 	#------ main command ------#
-	python main.py $dataset $class_file $modality $train_source_list $train_target_list $val_list --exp_path $exp_path \
+	# python main.py $dataset $class_file $modality $train_source_list $train_target_list $val_list --exp_path $exp_path \
+    # --arch $arch --pretrained $pretrained --baseline_type $baseline_type --frame_aggregation $frame_aggregation \
+	# --num_segments $num_segments --val_segments $val_segments --add_fc $add_fc --fc_dim $fc_dim --dropout_i 0.5 --dropout_v 0.5 \
+	# --use_target $use_target --share_params $share_params \
+	# --dis_DA $dis_DA --alpha $alpha --place_dis N Y N \
+	# --adv_DA $adv_DA --beta $beta_0 $beta_1 $beta_2 --place_adv $adv_pos_0 Y Y \
+	# --use_bn $use_bn --add_loss_DA $add_loss_DA --gamma $gamma \
+	# --ens_DA $ens_DA --mu $mu \
+	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame \
+	# --pred_normalize $pred_normalize --weighted_class_loss_DA $weighted_class_loss_DA --weighted_class_loss $weighted_class_loss \
+	# --gd $gd --lr $lr --lr_decay $lr_decay --lr_adaptive $lr_adaptive --lr_steps $lr_steps_1 $lr_steps_2 --epochs $epochs --optimizer $optimizer \
+	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	# -b $bS $bS_2 $bS -j 4 -ef 1 -pf 50 -sf 50 --copy_list N N --save_model \
+
+	python main.py $class_file $modality $train_source_list $train_target_list $val_list --exp_path $exp_path \
 	--arch $arch --pretrained $pretrained --baseline_type $baseline_type --frame_aggregation $frame_aggregation \
 	--num_segments $num_segments --val_segments $val_segments --add_fc $add_fc --fc_dim $fc_dim --dropout_i 0.5 --dropout_v 0.5 \
 	--use_target $use_target --share_params $share_params \
@@ -149,8 +164,8 @@ then
 	--adv_DA $adv_DA --beta $beta_0 $beta_1 $beta_2 --place_adv $adv_pos_0 Y Y \
 	--use_bn $use_bn --add_loss_DA $add_loss_DA --gamma $gamma \
 	--ens_DA $ens_DA --mu $mu \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame \
-	--pred_normalize $pred_normalize --weighted_class_loss_DA $weighted_class_loss_DA --weighted_class_loss $weighted_class_loss \
+	--weighted_class_loss_DA N --pred_normalize N \
+    --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame \
 	--gd $gd --lr $lr --lr_decay $lr_decay --lr_adaptive $lr_adaptive --lr_steps $lr_steps_1 $lr_steps_2 --epochs $epochs --optimizer $optimizer \
 	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
 	-b $bS $bS_2 $bS -j 4 -ef 1 -pf 50 -sf 50 --copy_list N N --save_model \
