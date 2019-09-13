@@ -14,7 +14,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=resnet101
-use_target=Sv # none | Sv | uSv
+use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 

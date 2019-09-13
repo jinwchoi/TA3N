@@ -16,6 +16,8 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 from PIL import Image
+import pandas as pd
+import pdb
 
 imageio.plugins.ffmpeg.download()
 init(autoreset=True)
@@ -34,6 +36,7 @@ parser.add_argument('--batch_size', type=int, required=False, default=1, help='b
 parser.add_argument('--start_class', type=int, required=False, default=1, help='the starting class id (start from 1)')
 parser.add_argument('--end_class', type=int, required=False, default=-1, help='the end class id')
 parser.add_argument('--class_file', type=str, default='class.txt', help='process the classes only in the class_file')
+parser.add_argument('--anno_file', type=str, default=None, help='annotation file contains the path of each video')
 args = parser.parse_args()
 
 # Create thread pool
@@ -48,9 +51,15 @@ feature_in_type = '.t7'
 
 #--- create dataset folders
 # root folder
-path_output = args.data_path + args.feature_in + '_' + args.base_model + '/'
+# path_output = args.data_path + args.feature_in + '_' + args.base_model + '/'
+# if args.structure != 'tsn':
+# 	path_output = args.data_path + args.feature_in + '-' + args.structure + '/'
+# if not os.path.isdir(path_output):
+# 	os.makedirs(path_output)
+
+path_output = args.feature_in + '_' + args.base_model + '/'
 if args.structure != 'tsn':
-	path_output = args.data_path + args.feature_in + '-' + args.structure + '/'
+	path_output = args.feature_in + '-' + args.structure + '/'
 if not os.path.isdir(path_output):
 	os.makedirs(path_output)
 
@@ -104,10 +113,10 @@ else:
 		])
 
 # read the class files
-if args.class_file == 'none':
-	class_names_proc = ['unlabeled']
-else:
-	class_names_proc = [line.strip().split(' ', 1)[1] for line in open(args.class_file)]
+# if args.class_file == 'none':
+# 	class_names_proc = ['unlabeled']
+# else:
+# 	class_names_proc = [line.strip().split(' ', 1)[1] for line in open(args.class_file)]
 
 ################### Main Function ###################
 def im2tensor(im):
@@ -143,7 +152,10 @@ def convert_c3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x112x
 
 def extract_features(video_file):
 	print(video_file)
-	video_name = os.path.splitext(video_file)[0]
+	if args.input_type == 'video':  # create the video folder if the data structure 
+		video_name = os.path.splitext(video_file)[0]
+	else:
+		video_name = '_'.join(video_file.split('/')[-4:])  
 	if args.structure == 'tsn':  # create the video folder if the data structure is TSN
 		if not os.path.isdir(path_output + video_name + '/'):
 			os.makedirs(path_output + video_name + '/')
@@ -164,18 +176,31 @@ def extract_features(video_file):
 		except RuntimeError:
 			print(Back.RED + 'Could not read frame', id_frame+1, 'from', video_file)
 	elif args.input_type == 'frames':
-		list_frames = os.listdir(path_input + class_name + '/' + video_file)
+		list_frames = os.listdir(video_file)
 		list_frames.sort()
 
 		# --- collect list of frame tensors
 		try:
 			for t in range(len(list_frames)):
-				im = imageio.imread(path_input + class_name + '/' + video_file + '/' + list_frames[t])
+				im = imageio.imread(video_file + '/' + list_frames[t])
 				if np.sum(im.shape) != 0:
 					id_frame = t+1
 					frames_tensor.append(im2tensor(im))  # include data pre-processing
 		except RuntimeError:
 			print(Back.RED + 'Could not read frame', id_frame+1, 'from', video_file)
+	# elif args.input_type == 'frames':
+	# 	list_frames = os.listdir(path_input + class_name + '/' + video_file)
+	# 	list_frames.sort()
+
+	# 	# --- collect list of frame tensors
+	# 	try:
+	# 		for t in range(len(list_frames)):
+	# 			im = imageio.imread(path_input + class_name + '/' + video_file + '/' + list_frames[t])
+	# 			if np.sum(im.shape) != 0:
+	# 				id_frame = t+1
+	# 				frames_tensor.append(im2tensor(im))  # include data pre-processing
+	# 	except RuntimeError:
+	# 		print(Back.RED + 'Could not read frame', id_frame+1, 'from', video_file)
 
 
 	#--- divide the list into two parts: major (can de divided by batch size) & the rest (will add dummy tensors)
@@ -217,37 +242,64 @@ def extract_features(video_file):
 
 ################### Main Program ###################
 # parse the classes
-list_class = os.listdir(path_input)
-list_class.sort()
+if args.anno_file is not None:
+    df = pd.read_csv(args.anno_file, header=None)
+    data = df.to_numpy()
 
-# for i in range(len(list_class)):
-# 	print(i, list_class[i])
-# exit()
+class_names = []
+data_dict = {}
+for row in data:
+    cur_cls = row[0].split('/')[-3]
+    # class_names.append()
+    if cur_cls not in data_dict:
+        data_dict[cur_cls] = []
+    data_dict[cur_cls].append(row[0])
 
-id_class_start = args.start_class-1
-id_class_end = len(list_class) if args.end_class <= 0 else args.end_class
+# class_names_proc = np.unique(np.array(class_names))
+
 start = time.time()
-
-for i in range(id_class_start, id_class_end):
+for class_name, val in data_dict.items():
 	start_class = time.time()
-	class_name = list_class[i]
-	if class_name in class_names_proc:
-		print(Fore.YELLOW + 'class ' + str(i+1) + ': ' + class_name)
+	if 1:
+		# print(Fore.YELLOW + 'class ' + str(i+1) + ': ' + class_name)
 
-		if args.structure == 'imagenet': # create the class folder if the data structure is ImageNet
-			if not os.path.isdir(path_output + class_name + '/'):
-				os.makedirs(path_output + class_name + '/')
+		# if args.structure == 'imagenet': # create the class folder if the data structure is ImageNet
+		# 	if not os.path.isdir(path_output + class_name + '/'):
+		# 		os.makedirs(path_output + class_name + '/')
 
-		list_video = os.listdir(path_input + class_name + '/')
-		list_video.sort()
-
-		pool.map(extract_features, list_video, chunksize=1)
+		# list_video = os.listdir(path_input + class_name + '/')
+		# list_video.sort()
+        
+		pool.map(extract_features, val, chunksize=1)
 
 		end_class = time.time()
 		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
-	else:
-		print(Fore.RED + class_name + ' is not selected !!')
 
 end = time.time()
 print('Total elapsed time: ' + str(end-start))
 print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
+
+# start = time.time()
+# pdb.set_trace()
+# for i,class_name in enumerate(class_names_proc):
+# 	start_class = time.time()
+# 	if class_name in class_names_proc:
+# 		print(Fore.YELLOW + 'class ' + str(i+1) + ': ' + class_name)
+
+# 		if args.structure == 'imagenet': # create the class folder if the data structure is ImageNet
+# 			if not os.path.isdir(path_output + class_name + '/'):
+# 				os.makedirs(path_output + class_name + '/')
+
+# 		list_video = os.listdir(path_input + class_name + '/')
+# 		list_video.sort()
+
+# 		pool.map(extract_features, list_video, chunksize=1)
+
+# 		end_class = time.time()
+# 		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
+# 	else:
+# 		print(Fore.RED + class_name + ' is not selected !!')
+
+# end = time.time()
+# print('Total elapsed time: ' + str(end-start))
+# print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
