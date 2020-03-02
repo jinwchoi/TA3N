@@ -20,6 +20,7 @@ from colorama import init
 from colorama import Fore, Back, Style
 import numpy as np
 from tensorboardX import SummaryWriter
+import pdb
 
 np.random.seed(1)
 torch.manual_seed(1)
@@ -55,6 +56,8 @@ def main():
 	# determine the categories
 	class_names = [line.strip().split(' ', 1)[1] for line in open(args.class_file)]
 	num_class = len(class_names)
+
+	# pdb.set_trace()
 
 	#=== check the folder existence ===#
 	path_exp = args.exp_path + args.modality + '/'

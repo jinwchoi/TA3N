@@ -19,7 +19,7 @@ parser.add_argument('--frame_in', default='RGB-feature', help='video frame/featu
 parser.add_argument('--max_num', default=-1, help='max number of training images/category (-1: all/0: avg #)', type=int, required=False)
 parser.add_argument('--random_each_video', default='N', type=str, choices=['Y','N'], help='randomly select videos for each video')
 parser.add_argument('--method_read', default='video', type=str, choices=['video','frame'], help='approach to load data')
-parser.add_argument('--DA_setting', default='hmdb_ucf', type=str, choices=['hmdb_ucf', 'hmdb_phav', 'ps_kinetics', 'kinetics_phav', 'ucf_olympic'], help='datasets for DA')
+parser.add_argument('--DA_setting', default='hmdb_ucf', type=str, choices=['hmdb_ucf', 'hmdb_phav', 'ps_kinetics', 'kinetics_necdrone', 'kinetics_phav', 'ucf_olympic'], help='datasets for DA')
 parser.add_argument('--suffix', default=None, help='additional string for filename', type=str, required=False)
 
 args = parser.parse_args()
@@ -74,7 +74,7 @@ elif 'ps' in args.dataset or 'kinetics' in args.dataset or 'phav' in args.datase
 	else:
 		file_suffix = '_full'
 
-	class_file = '../data/' + name_dataset + '_splits/class_list' + file_suffix + '.txt'
+	class_file = '../dataset/' + name_dataset + '_splits/class_list' + file_suffix + '.txt'
 
 	class_id = [int(line.strip().split(' ', 1)[0]) for line in open(class_file)]  # number shown in th text file
 	class_names = [line.strip().split(' ', 1)[1] for line in open(class_file)]

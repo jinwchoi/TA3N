@@ -1,0 +1,7 @@
+0 walk
+1 run
+2 jump
+3 drink  
+4 throw
+5 shake hands
+6 hug

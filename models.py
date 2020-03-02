@@ -11,6 +11,8 @@ import math
 from colorama import init
 from colorama import Fore, Back, Style
 
+import pdb
+
 torch.manual_seed(1)
 torch.cuda.manual_seed_all(1)
 
@@ -123,6 +125,7 @@ class VideoModel(nn.Module):
 			self.feature_dim = model_test.fc7.in_features
 		else:
 			model_test = getattr(torchvision.models, base_model)(True) # model_test is only used for getting the dim #
+			# pdb.set_trace()
 			self.feature_dim = model_test.fc.in_features
 
 		std = 0.001
@@ -632,6 +635,7 @@ class VideoModel(nn.Module):
 			feat_fc_video_source = feat_fc_source.view((-1, num_segments) + feat_fc_source.size()[-1:])  # reshape based on the segments (e.g. 640x512 --> 128x5x512)
 			feat_fc_video_target = feat_fc_target.view((-1, num_segments) + feat_fc_target.size()[-1:])  # reshape based on the segments (e.g. 640x512 --> 128x5x512)
 
+			# Use TRN to aggregate spatial features
 			feat_fc_video_relation_source = self.TRN(feat_fc_video_source) # 128x5x512 --> 128x5x256 (256-dim. relation feature vectors x 5)
 			feat_fc_video_relation_target = self.TRN(feat_fc_video_target)
 

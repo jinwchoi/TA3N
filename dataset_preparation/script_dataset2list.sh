@@ -1,10 +1,10 @@
 #!/bin/bash
 # ----------------------------------------------------------------------------------
 # variable
-dataset=olympic_train # # depend on users (e.g. hmdb51 | ucf101 | xxx_train | xxx_val) 
-data_path=/dataset/ # depend on users
-video_in=RGB
-frame_in=RGB-feature
+dataset=kinetics # # depend on users (e.g. hmdb51 | ucf101 | xxx_train | xxx_val) 
+data_path=/net/acadia9a/data/jchoi/data/ # depend on users
+video_in=vids
+frame_in=RGB-feature_resnet101
 max_num=-1 # 0 (class average) | -1 (all) | any number
 random_each_video=N # Y | N
 
@@ -13,7 +13,7 @@ random_each_video=N # Y | N
 # frame: load from the feature folder
 method_read=frame # video | frame
 frame_type=feature # frame | feature
-DA_setting=ucf_olympic # hmdb_ucf | hmdb_phav | ps_kinetics | kinetics_phav | ucf_olympic
+DA_setting=kinetics_necdrone # hmdb_ucf | hmdb_phav | ps_kinetics | kinetics_phav | ucf_olympic
 suffix='_'$DA_setting'-'$frame_type'_'$max_num
 
 python video_dataset2list.py $dataset --data_path $data_path \

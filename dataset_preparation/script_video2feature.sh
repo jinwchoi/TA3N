@@ -16,7 +16,7 @@ end_class=-1 # -1: process all the categories
 class_file=/net/acadia9a/data/jchoi/data/kinetics/anno/K7-ND7-classes.txt # none | XXX/class_list_DA.txt (depend on users)
 anno_file=/net/acadia9a/data/jchoi/data/kinetics/anno/kinetics-7-train.csv
 
-python -W ignore video2feature.py --data_path $data_path --video_in $video_in \
+python -W ignore video2feature_with_anno.py --data_path $data_path --video_in $video_in \
 --feature_in $feature_in --input_type $input_type --structure $structure \
 --num_thread $num_thread --batch_size $batch_size --base_model $base_model --pretrain_weight $pretrain_weight \
 --start_class $start_class --end_class $end_class --class_file $class_file --anno_file $anno_file

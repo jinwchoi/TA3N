@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task 5
 #SBATCH --time 144:00:00
 #SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/ucf2hmdb-resnet101_src_only_20200223_test_on_train.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/hmdb2ucf-resnet101_uda_20200223_test_on_train.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -30,7 +30,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=resnet101
-use_target=none # none | Sv | uSv
+use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -42,15 +42,15 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset/ # depend on users
-path_exp_root=experiments/action-experiments_u2h_src_only/ # depend on users
+path_exp_root=experiments/action-experiments_h2u_uda/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
-	dataset_source=ucf101 # depend on users
-	dataset_target=hmdb51 # depend on users
-	dataset_val=hmdb51 # depend on users
-	num_source=1438 # number of training data (source) 
-	num_target=840 # number of training data (target)
+	dataset_source=hmdb51 # depend on users
+	dataset_target=ucf101 # depend on users
+	dataset_val=ucf101 # depend on users
+	num_source=840 # number of training data (source) 
+	num_target=1438 # number of training data (target)
 
 	path_data_source=$path_data_root$dataset_source'/'
 	path_data_target=$path_data_root$dataset_target'/'
@@ -211,7 +211,7 @@ then
 	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
 	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
 	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
-	
+
 fi
 
 # ----------------------------------------------------------------------------------

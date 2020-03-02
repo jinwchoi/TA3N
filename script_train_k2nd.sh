@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task 5
 #SBATCH --time 144:00:00
 #SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/ucf2hmdb-resnet101_src_only_20200223_test_on_train.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/kinetics2nec_drone-7-test-resnet101_tgt_only_3e-2_30_epochs_20200226_test_on_both_src_tgt_train_bs_tgt_32_5segments.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -17,7 +17,7 @@ which python
 
 
 #====== parameters ======#
-dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
+dataset=kinetics_necdrone # hmdb_ucf | hmdb_ucf_small | ucf_olympic
 class_file='data/classInd_'$dataset'.txt'
 training=true # true | false
 testing=true # true | false
@@ -30,7 +30,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=resnet101
-use_target=none # none | Sv | uSv
+use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -42,19 +42,21 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset/ # depend on users
-path_exp_root=experiments/action-experiments_u2h_src_only/ # depend on users
+path_exp_root=experiments/action-experiments_k2nd_tgt_only_3e-2_30_epochs/ # depend on users
 
-if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
+if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ] || [ "$dataset" == "kinetics_necdrone" ]
 then
-	dataset_source=ucf101 # depend on users
-	dataset_target=hmdb51 # depend on users
-	dataset_val=hmdb51 # depend on users
-	num_source=1438 # number of training data (source) 
-	num_target=840 # number of training data (target)
+	dataset_source=kinetics # depend on users
+	dataset_target=necdrone # depend on users
+	dataset_val=necdrone # depend on users
+    dataset_test=necdrone # depend on users
+	num_source=9955 # number of training data (source) 
+	num_target=560 # number of training data (target)
 
 	path_data_source=$path_data_root$dataset_source'/'
 	path_data_target=$path_data_root$dataset_target'/'
 	path_data_val=$path_data_root$dataset_val'/'
+    path_data_test=$path_data_root$dataset_test'/'
 
 	if [[ "$dataset_source" =~ "train" ]]
 	then
@@ -77,9 +79,19 @@ then
     	dataset_val=$dataset_val'_val'
 	fi
 
+    if [[ "$dataset_test" =~ "test" ]]
+	then
+		dataset_test=$dataset_test
+	else
+    	dataset_test=$dataset_test'_test'
+	fi
+
 	train_source_list=$path_data_source'list_'$dataset_source'_'$dataset'-'$frame_type'.txt'
 	train_target_list=$path_data_target'list_'$dataset_target'_'$dataset'-'$frame_type'.txt'
 	val_list=$path_data_val'list_'$dataset_val'_'$dataset'-'$frame_type'.txt'
+
+    test_list=$path_data_test'list_'$dataset_test'_'$dataset'-'$frame_type'.txt'
+    echo $test_list
 
 	path_exp=$path_exp_root'Testexp'
 fi
@@ -111,8 +123,10 @@ mu=0
 # parameters for architectures
 bS=128 # batch size
 bS_2=$((bS * num_target / num_source ))
+# bS_2=32
 echo '('$bS', '$bS_2')'
 
+# lr=1e-3
 lr=3e-2
 #lr=1e-4
 optimizer=SGD
@@ -193,7 +207,37 @@ then
 	model=model_best # checkpoint | model_best
 	echo $model
 
-	# testing on the validation set
+    echo 'testing on the source training set'
+	# echo 'testing on the training set'
+    python test_models.py $class_file $modality \
+	$train_source_list $exp_path$modality'/'$model'.pth.tar' \
+	--arch $arch --test_segments $test_segments \
+	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+
+	echo 'testing on the target training set'
+	# echo 'testing on the training set'
+    python test_models.py $class_file $modality \
+	$train_target_list $exp_path$modality'/'$model'.pth.tar' \
+	--arch $arch --test_segments $test_segments \
+	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+
+    # testing on the test set
+	echo 'testing on the test set'
+    python test_models.py $class_file $modality \
+	$test_list $exp_path$modality'/'$model'.pth.tar' \
+	--arch $arch --test_segments $test_segments \
+	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+	
+    # testing on the validation set
 	echo 'testing on the validation set'
 	python test_models.py $class_file $modality \
 	$val_list $exp_path$modality'/'$model'.pth.tar' \
@@ -203,15 +247,6 @@ then
 	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
 	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
-	echo 'testing on the training set'
-	python test_models.py $class_file $modality \
-	$train_target_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
-	
 fi
 
 # ----------------------------------------------------------------------------------
