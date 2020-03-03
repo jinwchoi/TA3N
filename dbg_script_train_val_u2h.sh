@@ -4,7 +4,7 @@
 dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
 class_file='data/classInd_'$dataset'.txt'
 training=true # true | false
-testing=true # true | false
+testing=false # true | false
 modality=RGB 
 frame_type=feature # frame | feature
 num_segments=5 # sample frame # of each video for training
@@ -13,7 +13,7 @@ baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
 fc_dim=512
-arch=resnet101
+arch=i3d #resnet101
 use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 

@@ -29,7 +29,7 @@ parser.add_argument('--video_in', type=str, required=False, default='RGB', help=
 parser.add_argument('--feature_in', type=str, required=False, default='RGB-feature', help='name of output frame dataset')
 parser.add_argument('--input_type', type=str, default='video', choices=['video', 'frames'], help='input types for videos')
 parser.add_argument('--structure', type=str, default='tsn', choices=['tsn', 'imagenet'], help='data structure of output frames')
-parser.add_argument('--base_model', type=str, required=False, default='resnet101', choices=['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'c3d'])
+parser.add_argument('--base_model', type=str, required=False, default='resnet101', choices=['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'c3d', 'i3d'])
 parser.add_argument('--pretrain_weight', type=str, required=False, default='', help='model weight file path')
 parser.add_argument('--num_thread', type=int, required=False, default=-1, help='number of threads for multiprocessing')
 parser.add_argument('--batch_size', type=int, required=False, default=1, help='batch size')
@@ -46,18 +46,15 @@ print(Fore.CYAN + 'thread #:', num_thread)
 pool = ThreadPool(num_thread)
 
 ###### data path ######
-path_input = args.data_path + args.video_in + '/'
+if 'ucf' in args.data_path or 'hmdb' in args.data_path:
+	path_input = args.data_path + '/'
+else:
+	path_input = args.data_path + args.video_in + '/'
 feature_in_type = '.t7'
 
 #--- create dataset folders
-# root folder
-# path_output = args.data_path + args.feature_in + '_' + args.base_model + '/'
-# if args.structure != 'tsn':
-# 	path_output = args.data_path + args.feature_in + '-' + args.structure + '/'
-# if not os.path.isdir(path_output):
-# 	os.makedirs(path_output)
-
-path_output = args.feature_in + '_' + args.base_model + '/'
+# path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
+path_output = args.feature_in + '_' + args.base_model + '/' 
 if args.structure != 'tsn':
 	path_output = args.feature_in + '-' + args.structure + '/'
 if not os.path.isdir(path_output):
@@ -84,7 +81,25 @@ if args.base_model == 'c3d':
 	extractor_conv.eval()
 	extractor_fc = torch.nn.DataParallel(extractor_fc.cuda())
 	extractor_fc.eval()
+elif args.base_model == 'i3d':
+	import pytorch_i3d as i3d
+	i3d_clip_size = 16
+	model = i3d.InceptionI3d()
+	model.load_state_dict(torch.load('/net/ca-home1/home/ma/grv/code/pytorch-i3d/models/rgb_imagenet.pt'))
+	
+	list_model = list(model.children())
+	list_conv = list_model[3:]
+	list_fc = list_model[:1]
 
+	extractor_conv = nn.Sequential(*list_conv)
+	extractor_fc = nn.Sequential(*list_fc)
+
+	extractor_conv = torch.nn.DataParallel(extractor_conv.cuda())
+	extractor_conv.eval()
+	extractor_fc = torch.nn.DataParallel(extractor_fc.cuda())
+	extractor_fc.eval()
+	# model = torch.nn.DataParallel(model)
+	# model.eval()
 else:
 	model = getattr(models, args.base_model)(pretrained=True)
 	# remove the last layer
@@ -104,6 +119,17 @@ if args.base_model == 'c3d':
 		transforms.CenterCrop(112),
 		transforms.ToTensor(),
 		])
+elif args.base_model == 'i3d':
+	# data_transform = transforms.Compose([
+	# 	VT.Resize(256), 
+	# 	VT.RandomCrop(224), 
+	# 	VT.RandomHorizontalFlip()
+	# 	])
+	data_transform = transforms.Compose([
+		transforms.Resize(256), 
+		transforms.CenterCrop(224),
+		transforms.ToTensor()
+		])
 else:
 	data_transform = transforms.Compose([
 		transforms.Resize(224),
@@ -112,16 +138,13 @@ else:
 		transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 		])
 
-# read the class files
-# if args.class_file == 'none':
-# 	class_names_proc = ['unlabeled']
-# else:
-# 	class_names_proc = [line.strip().split(' ', 1)[1] for line in open(args.class_file)]
-
 ################### Main Function ###################
 def im2tensor(im):
 	im = Image.fromarray(im) # convert numpy array to PIL image
 	t_im = data_transform(im) # Create a PyTorch Variable with the transformed image
+	# if the backbone is i3d, normalize to [-1, 1]
+	if args.base_model == 'i3d':
+		t_im = (t_im/255.)*2 - 1
 	return t_im
 
 def extract_frame_feature_batch(list_tensor):
@@ -133,6 +156,12 @@ def extract_frame_feature_batch(list_tensor):
 			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
 			features_conv = extractor_conv(batch_tensor) # e.g. 113x512x1x4x4
 			features_conv = features_conv.view(features_conv.size(0),-1) # e.g. 113x8192
+			features = extractor_fc(features_conv)
+		elif args.base_model == 'i3d':
+			batch_tensor = convert_i3d_tensor_batch(batch_tensor) # e.g. 113x3x16x224x224
+			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
+			# features = model.extract_features(batch_tensor)
+			features_conv = extractor_conv(batch_tensor)
 			features = extractor_fc(features_conv)
 		else:
 			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
@@ -150,6 +179,15 @@ def convert_c3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x112x
 	batch_tensor_c3d = batch_tensor_c3d*255
 	return batch_tensor_c3d
 
+def convert_i3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x224x224
+	batch_tensor_i3d = torch.Tensor()
+	for b in range(batch_tensor.size(0)-i3d_clip_size+1):
+		tensor_i3d = batch_tensor[b:b+i3d_clip_size,:,:,:]
+		tensor_i3d = torch.transpose(tensor_i3d,0,1).unsqueeze(0)
+		batch_tensor_i3d = torch.cat((batch_tensor_i3d, tensor_i3d))
+
+	return batch_tensor_i3d
+
 def extract_features(video_file):
 	print(video_file)
 	if args.input_type == 'video':  # create the video folder if the data structure 
@@ -165,7 +203,13 @@ def extract_features(video_file):
 	frames_tensor = []
 	# print(class_name)
 	if args.input_type == 'video':
-		reader = imageio.get_reader(path_input + class_name + '/' + video_file)
+		tmp = video_file.split('/')
+		
+		if 'ucf' in args.data_path or 'hmdb' in args.data_path:
+			reader = imageio.get_reader(path_input + '/' + tmp[0] + '/' + tmp[1]+'.avi')
+		else:
+			reader = imageio.get_reader(path_input + '/' + tmp[1] + '/' + tmp[2])
+		# reader = imageio.get_reader(path_input + class_name + '/' + video_file)
 
 		#--- collect list of frame tensors
 		try:
@@ -188,25 +232,13 @@ def extract_features(video_file):
 					frames_tensor.append(im2tensor(im))  # include data pre-processing
 		except RuntimeError:
 			print(Back.RED + 'Could not read frame', id_frame+1, 'from', video_file)
-	# elif args.input_type == 'frames':
-	# 	list_frames = os.listdir(path_input + class_name + '/' + video_file)
-	# 	list_frames.sort()
-
-	# 	# --- collect list of frame tensors
-	# 	try:
-	# 		for t in range(len(list_frames)):
-	# 			im = imageio.imread(path_input + class_name + '/' + video_file + '/' + list_frames[t])
-	# 			if np.sum(im.shape) != 0:
-	# 				id_frame = t+1
-	# 				frames_tensor.append(im2tensor(im))  # include data pre-processing
-	# 	except RuntimeError:
-	# 		print(Back.RED + 'Could not read frame', id_frame+1, 'from', video_file)
-
 
 	#--- divide the list into two parts: major (can de divided by batch size) & the rest (will add dummy tensors)
 	num_frames = len(frames_tensor)
 	if num_frames == num_exist_files: # skip if the features are already saved
 		return
+
+	# pdb.set_trace()
 
 	num_major = num_frames//args.batch_size*args.batch_size
 	num_rest = num_frames - num_major
@@ -231,6 +263,7 @@ def extract_features(video_file):
 		id_frame = t+1
 		id_frame_name = str(id_frame).zfill(5)
 		if args.structure == 'tsn':
+			# pdb.set_trace()
 			filename = path_output + video_name + '/' + 'img_' + id_frame_name + feature_in_type
 		elif args.structure == 'imagenet':
 			filename = path_output + class_name + '/' + video_name + '_' + id_frame_name + feature_in_type
@@ -249,11 +282,14 @@ if args.anno_file is not None:
 class_names = []
 data_dict = {}
 for row in data:
-    cur_cls = row[0].split('/')[-3]
-    # class_names.append()
-    if cur_cls not in data_dict:
-        data_dict[cur_cls] = []
-    data_dict[cur_cls].append(row[0])
+	if 'ucf' in args.data_path or 'hmdb' in args.data_path:
+		cur_cls = row[0].split('/')[0]
+	else:
+		cur_cls = row[0].split('/')[-3]
+	# class_names.append()
+	if cur_cls not in data_dict:
+		data_dict[cur_cls] = []
+	data_dict[cur_cls].append(row[0])
 
 # class_names_proc = np.unique(np.array(class_names))
 
@@ -261,15 +297,8 @@ start = time.time()
 for class_name, val in data_dict.items():
 	start_class = time.time()
 	if 1:
-		# print(Fore.YELLOW + 'class ' + str(i+1) + ': ' + class_name)
+		# extract_features(val[0])
 
-		# if args.structure == 'imagenet': # create the class folder if the data structure is ImageNet
-		# 	if not os.path.isdir(path_output + class_name + '/'):
-		# 		os.makedirs(path_output + class_name + '/')
-
-		# list_video = os.listdir(path_input + class_name + '/')
-		# list_video.sort()
-        
 		pool.map(extract_features, val, chunksize=1)
 
 		end_class = time.time()
@@ -278,28 +307,3 @@ for class_name, val in data_dict.items():
 end = time.time()
 print('Total elapsed time: ' + str(end-start))
 print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
-
-# start = time.time()
-# pdb.set_trace()
-# for i,class_name in enumerate(class_names_proc):
-# 	start_class = time.time()
-# 	if class_name in class_names_proc:
-# 		print(Fore.YELLOW + 'class ' + str(i+1) + ': ' + class_name)
-
-# 		if args.structure == 'imagenet': # create the class folder if the data structure is ImageNet
-# 			if not os.path.isdir(path_output + class_name + '/'):
-# 				os.makedirs(path_output + class_name + '/')
-
-# 		list_video = os.listdir(path_input + class_name + '/')
-# 		list_video.sort()
-
-# 		pool.map(extract_features, list_video, chunksize=1)
-
-# 		end_class = time.time()
-# 		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
-# 	else:
-# 		print(Fore.RED + class_name + ' is not selected !!')
-
-# end = time.time()
-# print('Total elapsed time: ' + str(end-start))
-# print(Fore.GREEN + 'All the features are generated for ' + args.video_in)

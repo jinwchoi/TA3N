@@ -1,12 +1,3 @@
-'''
-This file is from the following repository:
-https://github.com/piergiaj/pytorch-i3d 
-
-which carries an Apache 2.0 license. 
-
-When used downstream please be aware of this.
-'''
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +8,7 @@ import numpy as np
 import os
 import sys
 from collections import OrderedDict
-import pdb
+
 
 class MaxPool3dSamePadding(nn.MaxPool3d):
     
@@ -30,12 +21,15 @@ class MaxPool3dSamePadding(nn.MaxPool3d):
     def forward(self, x):
         # compute 'same' padding
         (batch, channel, t, h, w) = x.size()
+        #print t,h,w
         out_t = np.ceil(float(t) / float(self.stride[0]))
         out_h = np.ceil(float(h) / float(self.stride[1]))
         out_w = np.ceil(float(w) / float(self.stride[2]))
+        #print out_t, out_h, out_w
         pad_t = self.compute_pad(0, t)
         pad_h = self.compute_pad(1, h)
         pad_w = self.compute_pad(2, w)
+        #print pad_t, pad_h, pad_w
 
         pad_t_f = pad_t // 2
         pad_t_b = pad_t - pad_t_f
@@ -45,6 +39,8 @@ class MaxPool3dSamePadding(nn.MaxPool3d):
         pad_w_b = pad_w - pad_w_f
 
         pad = (pad_w_f, pad_w_b, pad_h_f, pad_h_b, pad_t_f, pad_t_b)
+        #print x.size()
+        #print pad
         x = F.pad(x, pad)
         return super(MaxPool3dSamePadding, self).forward(x)
     
@@ -123,6 +119,8 @@ class Unit3D(nn.Module):
             x = self._activation_fn(x)
         return x
 
+
+
 class InceptionModule(nn.Module):
     def __init__(self, in_channels, out_channels, name):
         super(InceptionModule, self).__init__()
@@ -149,9 +147,6 @@ class InceptionModule(nn.Module):
         b2 = self.b2b(self.b2a(x))
         b3 = self.b3b(self.b3a(x))
         return torch.cat([b0,b1,b2,b3], dim=1)
-
-
-
 
 
 class InceptionI3d(nn.Module):

@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task 17
 #SBATCH --time 144:00:00
 #SBATCH -J i3d
-#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/nec_drone_2018-7-test-i3d-feat_extraction_20200302.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/Kinetics-7-train-i3d-feat_extraction_20200302.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -16,11 +16,11 @@ which python
 
 # ----------------------------------------------------------------------------------
 # variable
-data_path=/net/acadia7a/data/jchoi/NEC-Drone/Extracted_frames/Frames_anno_err_fixed/ # depend on users: UCF: /net/acadia7a/data/public_datasets/UCF101/UCF-101/, HMDB: /net/acadia9a/data/jchoi/data/hmdb/videos/
+data_path=/net/acadia9a/data/jchoi/data/kinetics/vids/ # depend on users: UCF: /net/acadia7a/data/public_datasets/UCF101/UCF-101/, HMDB: /net/acadia9a/data/jchoi/data/hmdb/videos/
 
-video_in=test
-feature_in=/net/acadia9a/data/jchoi/data/nec_drone/2018/TA3N/RGB-feature
-input_type=frames # video | frames
+video_in=train
+feature_in=/net/acadia9a/data/jchoi/data/kinetics/RGB-feature
+input_type=video # video | frames
 structure=tsn # tsn | imagenet
 num_thread=8
 batch_size=64 # need to be larger than 16 for c3d
@@ -29,7 +29,7 @@ pretrain_weight=/models/c3d.pickle # depend on users (only used for C3D model)
 start_class=1 # start from 1
 end_class=-1 # -1: process all the categories
 class_file=/net/acadia9a/data/jchoi/data/kinetics/anno/K7-ND7-classes.txt # none | XXX/class_list_DA.txt (depend on users)
-anno_file=/net/acadia7a/data/jchoi/NEC-Drone/Annotation/NEC-Drone-7_Annotation_10102018_testlist.csv
+anno_file=/net/acadia9a/data/jchoi/data/kinetics/anno/kinetics-7-train.csv
 
 python -W ignore video2feature_with_anno.py --data_path $data_path --video_in $video_in \
 --feature_in $feature_in --input_type $input_type --structure $structure \
