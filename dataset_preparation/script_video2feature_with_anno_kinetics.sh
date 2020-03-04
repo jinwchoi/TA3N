@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task 17
 #SBATCH --time 144:00:00
 #SBATCH -J i3d
-#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/Kinetics-7-train-i3d-feat_extraction_20200302.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/Kinetics-7-train-i3d-feat_extraction_20200303_part2of2.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -29,7 +29,7 @@ pretrain_weight=/models/c3d.pickle # depend on users (only used for C3D model)
 start_class=1 # start from 1
 end_class=-1 # -1: process all the categories
 class_file=/net/acadia9a/data/jchoi/data/kinetics/anno/K7-ND7-classes.txt # none | XXX/class_list_DA.txt (depend on users)
-anno_file=/net/acadia9a/data/jchoi/data/kinetics/anno/kinetics-7-train.csv
+anno_file=/net/acadia9a/data/jchoi/data/kinetics/anno/kinetics-7-train_from_running_treadlmill_part2.csv
 
 python -W ignore video2feature_with_anno.py --data_path $data_path --video_in $video_in \
 --feature_in $feature_in --input_type $input_type --structure $structure \

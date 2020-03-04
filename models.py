@@ -123,6 +123,10 @@ class VideoModel(nn.Module):
 			from C3D_model import C3D
 			model_test = C3D()
 			self.feature_dim = model_test.fc7.in_features
+		elif base_model == 'i3d':
+			from dataset_preparation.pytorch_i3d import InceptionI3d as I3D
+			model_test = I3D()
+			self.feature_dim = model_test.logits.conv3d.in_channels
 		else:
 			model_test = getattr(torchvision.models, base_model)(True) # model_test is only used for getting the dim #
 			# pdb.set_trace()

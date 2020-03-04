@@ -8,6 +8,7 @@ import cv2
 from colorama import init
 from colorama import Fore, Back, Style
 import pdb
+import pandas as pd
 
 init(autoreset=True)
 
@@ -18,6 +19,8 @@ parser.add_argument('--class_select', action="store_true", help='select some cla
 parser.add_argument('--data_path', default='data/', help='data path', type=str, required=False)
 parser.add_argument('--video_in', default='RGB', help='raw video folder name', type=str, required=False)
 parser.add_argument('--frame_in', default='RGB-feature', help='video frame/feature folder name', type=str, required=False)
+parser.add_argument('--ref_anno_file', default='', help='reference annotation file to look up the train/test split', type=str, required=False)
+parser.add_argument('--split', default='', help='train/test split', type=str, required=False)
 parser.add_argument('--max_num', default=-1, help='max number of training images/category (-1: all/0: avg #)', type=int, required=False)
 parser.add_argument('--random_each_video', default='N', type=str, choices=['Y','N'], help='randomly select videos for each video')
 parser.add_argument('--method_read', default='video', type=str, choices=['video','frame'], help='approach to load data')
@@ -30,9 +33,19 @@ args = parser.parse_args()
 print(Fore.GREEN + 'dataset:', args.dataset)
 path_frame_dataset = args.data_path + args.dataset + '/' + args.frame_in + '/'
 
-pdb.set_trace()
+# get the current split's video list from the reference annotation file
+df = pd.read_csv(args.ref_anno_file, header=None)
+data = df.to_numpy()
+video_list = []
+for row in data:
+	tmp = row[0].split(' ')
+	# video_list.append(tmp[0].split('/')[3]) # ucf
+	video_list.append(tmp[0].split('/')[1]) # hmdb
+	
 list_video = os.listdir(path_frame_dataset)
 list_video.sort()
+
+# pdb.set_trace()
 
 # path_video_dataset = args.data_path + args.dataset + '/' + args.video_in + '/'
 path_video_dataset = args.data_path + args.dataset + '/' + args.frame_in
@@ -92,14 +105,13 @@ else:
 # print(list_class)
 # print(class_id)
 
+# pdb.set_trace()
+
 num_class = len(set(class_id)) # get the unique indices
 list_class_video = [[] for i in range(num_class)] # create a list to store video paths in terms of new categories
 num_class_video = np.zeros(num_class, dtype=int) # record the number of data for each class
 ################### Main Function ###################
 #=== store all the video paths ===#
-
-
-pdb.set_trace()
 for i in range(len(class_names)):
 	print(i, class_names[i])
 	list_video = os.listdir(path_video_dataset + '/' + class_names[i])
@@ -108,10 +120,14 @@ for i in range(len(class_names)):
 	id_category = class_id[i]
 
 	if args.method_read == 'video':
-		lines_path = [path_frame_dataset + list_video_name[t] + ' ' + str(int(cv2.VideoCapture(path_video_dataset + class_names[i] + '/' + list_video_name[t] + '.mp4').get(cv2.CAP_PROP_FRAME_COUNT))) + ' ' + str(id_category) + '\n' for t in range(len(list_video))]
+		lines_path = [path_frame_dataset + list_video_name[t] + ' ' + str(int(cv2.VideoCapture(path_video_dataset + class_names[i] + '/' + list_video_name[t] + '.mp4').get(cv2.CAP_PROP_FRAME_COUNT))) + ' ' + str(id_category) + '\n' for t in range(len(list_video)) if list_video_name[t] in video_list]
 
 	elif args.method_read == 'frame':
-		lines_path = [path_frame_dataset + list_video_name[t] + ' ' + str(len(os.listdir(path_frame_dataset + class_names[i]  + '/' + list_video_name[t]))) + ' ' + str(id_category) + '\n' for t in range(len(list_video))]
+		# lines_path = [path_frame_dataset + list_video_name[t] + ' ' + str(len(os.listdir(path_frame_dataset + class_names[i]  + '/' + list_video_name[t]))) + ' ' + str(id_category) + '\n' for t in range(len(list_video)) if list_video_name[t] in video_list]
+		# hmdb
+		lines_path = [path_frame_dataset + class_names[i] + '/' + list_video_name[t] + ' ' + str(len(os.listdir(path_frame_dataset + class_names[i]  + '/' + list_video_name[t]))) + ' ' + str(id_category) + '\n' for t in range(len(list_video)) if list_video_name[t] in video_list]
+		
+		lines_path2 = [path_frame_dataset + class_names[i] + '/' + list_video_name[t] + ' ' + str(len(os.listdir(path_frame_dataset + class_names[i]  + '/' + list_video_name[t]))) + ' ' + str(id_category) + '\n' for t in range(len(list_video)) if list_video_name[t] not in video_list]
 
 	# print(list_current_class_video)
 	list_class_video[id_category] = list_class_video[id_category] + lines_path
@@ -120,7 +136,7 @@ for i in range(len(class_names)):
 num_avg_class = int(num_class_video.mean())
 max_num = num_avg_class if args.max_num == 0 else args.max_num
 
-pdb.set_trace()
+
 #=== randomly select video paths to write the list ===#
 if args.suffix:
 	file = open(args.data_path + args.dataset + '/' + 'list_' + args.dataset + args.suffix + '.txt','w')
