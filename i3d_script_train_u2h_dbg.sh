@@ -7,14 +7,14 @@ training=true # true | false
 testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
-num_segments=5 # sample frame # of each video for training
-test_segments=5
+num_segments=3 # sample frame # of each video for training
+test_segments=3
 baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
 fc_dim=512
 arch=i3d
-use_target=none # none | Sv | uSv
+use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -25,8 +25,8 @@ else
 fi
 
 #====== select dataset ======#
-path_data_root=dataset/ # depend on users
-path_exp_root=experiments/i3d/action-experiments_u2h_src_only/ # depend on users
+path_data_root=dataset_i3d/ # depend on users
+path_exp_root=experiments/i3d/action-experiments_u2h_tgt_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
@@ -97,8 +97,8 @@ bS=128 # batch size
 bS_2=$((bS * num_target / num_source ))
 echo '('$bS', '$bS_2')'
 
-lr=3e-2
-#lr=1e-4
+# lr=3e-2
+lr=1e-4
 optimizer=SGD
 
 if [ "$use_target" == "none" ] 

@@ -41,7 +41,7 @@ else
 fi
 
 #====== select dataset ======#
-path_data_root=dataset/ # depend on users
+path_data_root=dataset_i3d/ # depend on users
 path_exp_root=experiments/i3d/action-experiments_u2h_src_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
