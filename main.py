@@ -349,6 +349,8 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 	attn_epoch_source = torch.Tensor()
 	attn_epoch_target = torch.Tensor()
 	for i, ((source_data, source_label),(target_data, target_label)) in data_loader:
+		# pdb.set_trace()
+
 		# setup hyperparameters
 		p = float(i + start_steps) / total_steps
 		beta_dann = 2. / (1. + np.exp(-10 * p)) - 1
@@ -686,6 +688,7 @@ def validate(val_loader, model, criterion, num_class, epoch, log):
 		label_val_display = None
 
 	for i, (val_data, val_label) in enumerate(val_loader):
+		# pdb.set_trace()
 
 		val_size_ori = val_data.size()  # original shape
 		batch_val_ori = val_size_ori[0]

@@ -7,12 +7,12 @@ training=true # true | false
 testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
-num_segments=3 # sample frame # of each video for training
-test_segments=3
+num_segments=5 # sample frame # of each video for training
+test_segments=5
 baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
-add_fc=1
-fc_dim=512
+add_fc=3
+fc_dim=1024
 arch=i3d
 use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
@@ -26,15 +26,15 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiments_u2h_tgt_only/ # depend on users
+path_exp_root=experiments/i3d/action-experiment_h2u_tgt_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
-	dataset_source=ucf101 # depend on users
-	dataset_target=hmdb51 # depend on users
-	dataset_val=hmdb51 # depend on users
-	num_source=1438 # number of training data (source) 
-	num_target=840 # number of training data (target)
+	dataset_source=hmdb51 # depend on users
+	dataset_target=ucf101 # depend on users
+	dataset_val=ucf101 # depend on users
+	num_source=840 # number of training data (source) 
+	num_target=1438 # number of training data (target)
 
 	path_data_source=$path_data_root$dataset_source'/'
 	path_data_target=$path_data_root$dataset_target'/'
@@ -97,8 +97,9 @@ bS=128 # batch size
 bS_2=$((bS * num_target / num_source ))
 echo '('$bS', '$bS_2')'
 
-# lr=3e-2
-lr=1e-4
+# lr=1e-4
+lr=3e-2
+# lr=1e-4
 optimizer=SGD
 
 if [ "$use_target" == "none" ] 
@@ -138,7 +139,7 @@ then
     	lr_adaptive=dann # none | loss | dann
     	lr_steps_1=10
     	lr_steps_2=20
-    	epochs=30
+    	epochs=100
 	gd=20
 	
 	#------ main command ------#

@@ -53,8 +53,8 @@ else:
 feature_in_type = '.t7'
 
 #--- create dataset folders
-# path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
-path_output = args.feature_in + '_' + args.base_model + '/' 
+path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
+# path_output = args.feature_in + '_' + args.base_model + '/' 
 if args.structure != 'tsn':
 	path_output = args.feature_in + '-' + args.structure + '/'
 if not os.path.isdir(path_output):
@@ -179,7 +179,7 @@ def convert_c3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x112x
 	batch_tensor_c3d = batch_tensor_c3d*255
 	return batch_tensor_c3d
 
-def convert_i3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x224x224
+def convert_i3d_tensor_batch(batch_tensor): # e.g. 30x3x224x224 --> 15x3x16x224x224
 	batch_tensor_i3d = torch.Tensor()
 	for b in range(batch_tensor.size(0)-i3d_clip_size+1):
 		tensor_i3d = batch_tensor[b:b+i3d_clip_size,:,:,:]

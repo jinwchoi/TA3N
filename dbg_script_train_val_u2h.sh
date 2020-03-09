@@ -4,7 +4,7 @@
 dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
 class_file='data/classInd_'$dataset'.txt'
 training=true # true | false
-testing=false # true | false
+testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
 num_segments=5 # sample frame # of each video for training
@@ -13,8 +13,8 @@ baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
 fc_dim=512
-arch=i3d #resnet101
-use_target=uSv # none | Sv | uSv
+arch=resnet101
+use_target=none # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -26,7 +26,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset/ # depend on users
-path_exp_root=experiments/dbg/action-experiments_u2h_uda/ # depend on users
+path_exp_root=experiments/dbg/action-experiments_u2h_src_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
@@ -187,14 +187,14 @@ then
 	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
 	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
-	echo 'testing on the training set'
-	python test_models.py $class_file $modality \
-	$train_target_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+	# echo 'testing on the training set'
+	# python test_models.py $class_file $modality \
+	# $train_target_list $exp_path$modality'/'$model'.pth.tar' \
+	# --arch $arch --test_segments $test_segments \
+	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 	
 fi
 

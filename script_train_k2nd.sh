@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task 5
 #SBATCH --time 144:00:00
 #SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/kinetics2nec_drone-7-test-resnet101_tgt_only_3e-2_30_epochs_20200226_test_on_both_src_tgt_train_bs_tgt_32_5segments.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/kinetics2nec_drone-7-test-resnet101_uda_TA2N_20200304.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -30,7 +30,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=resnet101
-use_target=Sv # none | Sv | uSv
+use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -42,7 +42,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset/ # depend on users
-path_exp_root=experiments/action-experiments_k2nd_tgt_only_3e-2_30_epochs/ # depend on users
+path_exp_root=experiments/action-experiments_k2nd_uda_TA3N/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ] || [ "$dataset" == "kinetics_necdrone" ]
 then
@@ -109,7 +109,7 @@ beta_0=0.75 # depend on users
 beta_1=0.75 # depend on users
 beta_2=0.5 # depend on users
 
-use_attn=TransAttn # none | TransAttn | general
+use_attn=none # none | TransAttn | general
 n_attn=1
 use_attn_frame=none # none | TransAttn | general
 
@@ -207,25 +207,25 @@ then
 	model=model_best # checkpoint | model_best
 	echo $model
 
-    echo 'testing on the source training set'
-	# echo 'testing on the training set'
-    python test_models.py $class_file $modality \
-	$train_source_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+    # echo 'testing on the source training set'
+	# # echo 'testing on the training set'
+    # python test_models.py $class_file $modality \
+	# $train_source_list $exp_path$modality'/'$model'.pth.tar' \
+	# --arch $arch --test_segments $test_segments \
+	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
-	echo 'testing on the target training set'
-	# echo 'testing on the training set'
-    python test_models.py $class_file $modality \
-	$train_target_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+	# echo 'testing on the target training set'
+	# # echo 'testing on the training set'
+    # python test_models.py $class_file $modality \
+	# $train_target_list $exp_path$modality'/'$model'.pth.tar' \
+	# --arch $arch --test_segments $test_segments \
+	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
     # testing on the test set
 	echo 'testing on the test set'
@@ -238,14 +238,14 @@ then
 	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 	
     # testing on the validation set
-	echo 'testing on the validation set'
-	python test_models.py $class_file $modality \
-	$val_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+	# echo 'testing on the validation set'
+	# python test_models.py $class_file $modality \
+	# $val_list $exp_path$modality'/'$model'.pth.tar' \
+	# --arch $arch --test_segments $test_segments \
+	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
 fi
 
