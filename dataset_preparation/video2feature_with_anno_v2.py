@@ -18,6 +18,8 @@ from torch.autograd import Variable
 from PIL import Image
 import pandas as pd
 import pdb
+import torch.nn.functional as F
+
 
 imageio.plugins.ffmpeg.download()
 init(autoreset=True)
@@ -66,7 +68,7 @@ print(Fore.GREEN + 'Pre-trained model:', args.base_model)
 
 if args.base_model == 'c3d':
 	from C3D_model import C3D
-	c3d_clip_size = 16
+	clip_size = 16
 	model = C3D()
 	model.load_state_dict(torch.load(args.pretrain_weight))
     
@@ -83,7 +85,7 @@ if args.base_model == 'c3d':
 	extractor_fc.eval()
 elif args.base_model == 'i3d':
 	import pytorch_i3d as i3d
-	i3d_clip_size = 16
+	clip_size = 16
 	model = i3d.InceptionI3d()
 	model.load_state_dict(torch.load('/net/ca-home1/home/ma/grv/code/pytorch-i3d/models/rgb_imagenet.pt'))
 	
@@ -148,16 +150,10 @@ def im2tensor(im):
 	return t_im
 
 def extract_frame_feature_batch(list_tensor):
-	with torch.no_grad():
-		batch_tensor = torch.stack(list_tensor)
-
-		if args.base_model == 'c3d':
-			batch_tensor = convert_c3d_tensor_batch(batch_tensor) # e.g. 113x3x16x112x112
-			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
-			features_conv = extractor_conv(batch_tensor) # e.g. 113x512x1x4x4
-			features_conv = features_conv.view(features_conv.size(0),-1) # e.g. 113x8192
-			features = extractor_fc(features_conv)
-		elif args.base_model == 'i3d':
+	with torch.no_grad():		
+		if args.base_model == 'i3d':
+			# batch_tensor = list_tensor.permute(1,0,2,3).unsqueeze_(0)
+			batch_tensor = list_tensor
 			batch_tensor = convert_i3d_tensor_batch(batch_tensor) # e.g. 113x3x16x224x224
 			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
 			# features = model.extract_features(batch_tensor)
@@ -171,18 +167,20 @@ def extract_frame_feature_batch(list_tensor):
 
 def convert_c3d_tensor_batch(batch_tensor): # e.g. 30x3x112x112 --> 15x3x16x112x112
 	batch_tensor_c3d = torch.Tensor()
-	for b in range(batch_tensor.size(0)-c3d_clip_size+1):
-		tensor_c3d = batch_tensor[b:b+c3d_clip_size,:,:,:]
+	for b in range(batch_tensor.size(0)-clip_size+1):
+		tensor_c3d = batch_tensor[b:b+clip_size,:,:,:]
 		tensor_c3d = torch.transpose(tensor_c3d,0,1).unsqueeze(0)
 		batch_tensor_c3d = torch.cat((batch_tensor_c3d, tensor_c3d))
 
 	batch_tensor_c3d = batch_tensor_c3d*255
 	return batch_tensor_c3d
 
-def convert_i3d_tensor_batch(batch_tensor): # e.g. 30x3x224x224 --> 15x3x16x224x224
+def convert_i3d_tensor_batch(batch_tensor): 
+	# Dense sampling (1 frame stride) of the input tensor to make a batch of clip tensors
+	# e.g. 1x3xTx224x224 --> Bx3x16x224x224
 	batch_tensor_i3d = torch.Tensor()
-	for b in range(batch_tensor.size(0)-i3d_clip_size+1):
-		tensor_i3d = batch_tensor[b:b+i3d_clip_size,:,:,:]
+	for b in range(batch_tensor.size(0)-clip_size):
+		tensor_i3d = batch_tensor[b:b+clip_size,:,:,:]
 		tensor_i3d = torch.transpose(tensor_i3d,0,1).unsqueeze(0)
 		batch_tensor_i3d = torch.cat((batch_tensor_i3d, tensor_i3d))
 
@@ -237,26 +235,35 @@ def extract_features(video_file):
 	num_frames = len(frames_tensor)
 	if num_frames == num_exist_files: # skip if the features are already saved
 		return
+	
+	# zeropad the beginning and the end of the video 
+	frames_batch = F.pad(torch.stack(frames_tensor), pad=(0,0,0,0,0,0,int(clip_size/2),int(clip_size/2)), mode='constant', value=0)
 
-	pdb.set_trace()
+	# num_major = num_frames//args.batch_size*args.batch_size
+	# num_rest = num_frames - num_major
 
-	num_major = num_frames//args.batch_size*args.batch_size
-	num_rest = num_frames - num_major
-
-	# add dummy tensor to make total size == batch_size*N
-	num_dummy = args.batch_size - num_rest
-	for i in range(num_dummy):
-		frames_tensor.append(torch.zeros_like(frames_tensor[0]))
+	# # add dummy tensor to make total size == batch_size*N
+	# num_dummy = args.batch_size - num_rest
+	# for i in range(num_dummy):
+	# 	frames_tensor.append(torch.zeros_like(frames_tensor[0]))
 
 	#--- extract video features
-	features = torch.Tensor()
+	# features = torch.Tensor()
 
-	for t in range(0, num_frames+num_dummy, args.batch_size):
-		frames_batch = frames_tensor[t:t+args.batch_size]
-		features_batch = extract_frame_feature_batch(frames_batch)
-		features = torch.cat((features,features_batch))
+	# for t in range(0, num_frames+num_dummy, args.batch_size):
+	# 	frames_batch = frames_tensor[t:t+args.batch_size]
+	# 	features_batch = extract_frame_feature_batch(frames_batch)
+	# 	features = torch.cat((features,features_batch))
 
-	features = features[:num_frames] # remove the dummy part
+	# features = features[:num_frames] # remove the dummy part
+	
+	features_batch = extract_frame_feature_batch(frames_batch)
+
+	assert features_batch.shape[0] == num_frames
+
+	features = features_batch
+
+	# features = features_batch[int(clip_size/2):int(features_batch.shape[0]-clip_size/2)] # remove the dummy part
 
 	#--- save the frame-level feature vectors to files
 	for t in range(features.size(0)):
@@ -297,9 +304,9 @@ start = time.time()
 for class_name, val in data_dict.items():
 	start_class = time.time()
 	if 1:
-		extract_features(val[0])
+		# extract_features(val[0])
 
-		# pool.map(extract_features, val, chunksize=1)
+		pool.map(extract_features, val, chunksize=1)
 
 		end_class = time.time()
 		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
