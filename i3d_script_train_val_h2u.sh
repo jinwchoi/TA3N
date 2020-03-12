@@ -1,4 +1,20 @@
-#!/bin/bash 
+#!/bin/bash -l
+#SBATCH --mem=32gb
+#SBATCH --gres=gpu:1
+#SBATCH --constraint="TITANX|TITANXP|GTX1080Ti"
+##SBATCH --constraint="K80"
+#SBATCH --exclude="skyserver18k"
+#SBATCH --cpus-per-task 5
+#SBATCH --time 144:00:00
+#SBATCH -J resnet101
+#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/hmdb2ucf-i3d_src_only_20200312.log
+
+pwd; hostname; date
+echo $CUDA_VISIBLE_DEVICES
+
+source activate ta3n
+which python
+
 
 #====== parameters ======#
 dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
@@ -14,7 +30,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=i3d
-use_target=uSv # none | Sv | uSv
+use_target=none # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -26,7 +42,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiment_h2u_uda/ # depend on users
+path_exp_root=experiments/i3d/action-experiment_h2u_src_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then

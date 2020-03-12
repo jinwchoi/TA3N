@@ -14,7 +14,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=i3d
-use_target=Sv # none | Sv | uSv
+use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -26,7 +26,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiment_u2h_tgt_only/ # depend on users
+path_exp_root=experiments/i3d/action-experiment_u2h_uda/ # depend on users
 # path_exp_root=experiments/i3d/action-experiment_u2u_tgt_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
