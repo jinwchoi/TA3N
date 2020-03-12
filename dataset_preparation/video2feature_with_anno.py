@@ -238,8 +238,6 @@ def extract_features(video_file):
 	if num_frames == num_exist_files: # skip if the features are already saved
 		return
 
-	pdb.set_trace()
-
 	num_major = num_frames//args.batch_size*args.batch_size
 	num_rest = num_frames - num_major
 
@@ -269,6 +267,8 @@ def extract_features(video_file):
 			filename = path_output + class_name + '/' + video_name + '_' + id_frame_name + feature_in_type
 		else:
 			raise NameError(Back.RED + 'not valid data structure')
+	
+		# pdb.set_trace()
 
 		if not os.path.exists(filename):
 			torch.save(features[t].clone(), filename) # if no clone(), the size of features[t] will be the same as features

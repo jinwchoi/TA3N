@@ -141,7 +141,10 @@ class TSNDataSet(data.Dataset):
 
         # process_data = self.transform(frames)
         process_data = torch.stack(frames)
-
+        
+        # print(record.path)
+        # print(indices)
+        
         return process_data, record.label
 
     def __len__(self):

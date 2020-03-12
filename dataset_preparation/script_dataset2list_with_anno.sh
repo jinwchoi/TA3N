@@ -1,13 +1,13 @@
 #!/bin/bash
 # ----------------------------------------------------------------------------------
 # variable
-dataset=ucf101 # # depend on users (e.g. hmdb51 | ucf101 | xxx_train | xxx_val) 
+dataset=hmdb51 # # depend on users (e.g. hmdb51 | ucf101 | xxx_train | xxx_val) 
 data_path=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/ # depend on users
 video_in=vids
-frame_in=RGB-feature_i3d
+frame_in=RGB-feature2_i3d 
 max_num=-1 # 0 (class average) | -1 (all) | any number
 random_each_video=N # Y | N
-ref_anno_file=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/ucf_anno/anno_ucf_full_val.txt 
+ref_anno_file=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/hmdb_anno/anno_hmdb_full_val.txt 
 split=val
 
 # method_read: affect the loaded frame numbers

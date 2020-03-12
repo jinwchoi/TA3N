@@ -46,6 +46,7 @@ max_thread = 8 # there are some issues if too many threads
 num_thread = args.num_thread if args.num_thread>0 and args.num_thread<=max_thread else max_thread
 print(Fore.CYAN + 'thread #:', num_thread)
 pool = ThreadPool(num_thread)
+print('batch size: {}'.format(args.batch_size))
 
 ###### data path ######
 if 'ucf' in args.data_path or 'hmdb' in args.data_path:
@@ -55,8 +56,8 @@ else:
 feature_in_type = '.t7'
 
 #--- create dataset folders
-path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
-# path_output = args.feature_in + '_' + args.base_model + '/' 
+# path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
+path_output = args.feature_in + '_' + args.base_model + '/' 
 if args.structure != 'tsn':
 	path_output = args.feature_in + '-' + args.structure + '/'
 if not os.path.isdir(path_output):
@@ -151,17 +152,16 @@ def im2tensor(im):
 
 def extract_frame_feature_batch(list_tensor):
 	with torch.no_grad():		
-		if args.base_model == 'i3d':
-			# batch_tensor = list_tensor.permute(1,0,2,3).unsqueeze_(0)
-			batch_tensor = list_tensor
-			batch_tensor = convert_i3d_tensor_batch(batch_tensor) # e.g. 113x3x16x224x224
+		batch_tensor_list = convert_i3d_tensor_batch(list_tensor) # e.g. 113x3x16x224x224
+		features_list = []
+		for batch_tensor in batch_tensor_list:
 			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
 			# features = model.extract_features(batch_tensor)
 			features_conv = extractor_conv(batch_tensor)
-			features = extractor_fc(features_conv)
-		else:
-			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
-			features = extractor(batch_tensor)
+			cur_features = extractor_fc(features_conv)
+			features_list.append(cur_features)
+
+		features = torch.cat(features_list, dim=0)
 		features = features.view(features.size(0), -1).cpu()
 		return features
 
@@ -183,8 +183,17 @@ def convert_i3d_tensor_batch(batch_tensor):
 		tensor_i3d = batch_tensor[b:b+clip_size,:,:,:]
 		tensor_i3d = torch.transpose(tensor_i3d,0,1).unsqueeze(0)
 		batch_tensor_i3d = torch.cat((batch_tensor_i3d, tensor_i3d))
+	
+	num_chunks = int(np.ceil(batch_tensor_i3d.shape[0]/args.batch_size))
+	batch_tensor_i3d_list = []
+	for i in range(num_chunks-1):
+		cur_tensor = batch_tensor_i3d[i*args.batch_size:(i+1)*args.batch_size]
+		batch_tensor_i3d_list.append(cur_tensor)
+	if (num_chunks-1)*args.batch_size < batch_tensor_i3d.shape[0]:
+		cur_tensor = batch_tensor_i3d[(num_chunks-1)*args.batch_size:]
+		batch_tensor_i3d_list.append(cur_tensor)
 
-	return batch_tensor_i3d
+	return batch_tensor_i3d_list
 
 def extract_features(video_file):
 	print(video_file)
@@ -234,10 +243,13 @@ def extract_features(video_file):
 	#--- divide the list into two parts: major (can de divided by batch size) & the rest (will add dummy tensors)
 	num_frames = len(frames_tensor)
 	if num_frames == num_exist_files: # skip if the features are already saved
+		print('Features already exist: {}'.format(path_output + video_name))
 		return
 	
 	# zeropad the beginning and the end of the video 
-	frames_batch = F.pad(torch.stack(frames_tensor), pad=(0,0,0,0,0,0,int(clip_size/2),int(clip_size/2)), mode='constant', value=0)
+	zero_padding = torch.zeros_like(torch.stack(frames_tensor)[:int(clip_size/2)])
+	frames_batch = torch.cat([zero_padding, torch.stack(frames_tensor), zero_padding], dim=0)
+	# frames_batch = F.pad(torch.stack(frames_tensor), pad=(0,0,0,0,0,0,int(clip_size/2),int(clip_size/2)), mode='constant', value=0)
 
 	# num_major = num_frames//args.batch_size*args.batch_size
 	# num_rest = num_frames - num_major
@@ -300,16 +312,35 @@ for row in data:
 
 # class_names_proc = np.unique(np.array(class_names))
 
+
+# start = time.time()
+# for class_name, val in data_dict.items():
+# 	start_class = time.time()
+# 	for cur_val in val:
+# 		start_vid = time.time()
+# 		extract_features(cur_val)
+# 		# pdb.set_trace()
+# 		# pool.map(extract_features, val, chunksize=1)
+# 		end_vid = time.time()
+# 		print('Elapsed time for ' + cur_val + ': ' + str(end_vid-start_vid))
+# 	end_class = time.time()
+# 	print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
+
+# end = time.time()
+# print('Total elapsed time: ' + str(end-start))
+# print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
+
+
 start = time.time()
 for class_name, val in data_dict.items():
 	start_class = time.time()
-	if 1:
-		# extract_features(val[0])
+	# extract_features(val[0])
 
-		pool.map(extract_features, val, chunksize=1)
+	# pdb.set_trace()
+	pool.map(extract_features, val, chunksize=1)
 
-		end_class = time.time()
-		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
+	end_class = time.time()
+	print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
 
 end = time.time()
 print('Total elapsed time: ' + str(end-start))

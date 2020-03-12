@@ -1,20 +1,4 @@
-#!/bin/bash -l
-#SBATCH --mem=32gb
-#SBATCH --gres=gpu:1
-#SBATCH --constraint="TITANX|TITANXP|GTX1080Ti"
-##SBATCH --constraint="K80"
-#SBATCH --exclude="skyserver30k"
-#SBATCH --cpus-per-task 5
-#SBATCH --time 144:00:00
-#SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/ucf2hmdb-i3d_src_only_20200311.log
-
-pwd; hostname; date
-echo $CUDA_VISIBLE_DEVICES
-
-source activate ta3n
-which python
-
+#!/bin/bash 
 
 #====== parameters ======#
 dataset=hmdb_ucf # hmdb_ucf | hmdb_ucf_small | ucf_olympic
@@ -30,7 +14,7 @@ frame_aggregation=trn-m # method to integrate the frame-level features (avgpool 
 add_fc=1
 fc_dim=512
 arch=i3d
-use_target=none # none | Sv | uSv
+use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -42,15 +26,15 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiments_u2h_src_only/ # depend on users
+path_exp_root=experiments/i3d/action-experiment_h2u_tgt_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
-	dataset_source=ucf101 # depend on users
-	dataset_target=hmdb51 # depend on users
-	dataset_val=hmdb51 # depend on users
-	num_source=1438 # number of training data (source) 
-	num_target=840 # number of training data (target)
+	dataset_source=hmdb51 # depend on users
+	dataset_target=ucf101 # depend on users
+	dataset_val=ucf101 # depend on users
+	num_source=840 # number of training data (source) 
+	num_target=1438 # number of training data (target)
 
 	path_data_source=$path_data_root$dataset_source'/'
 	path_data_target=$path_data_root$dataset_target'/'
@@ -113,8 +97,9 @@ bS=128 # batch size
 bS_2=$((bS * num_target / num_source ))
 echo '('$bS', '$bS_2')'
 
+# lr=1e-4
 lr=3e-2
-#lr=1e-4
+# lr=1e-4
 optimizer=SGD
 
 if [ "$use_target" == "none" ] 
@@ -151,7 +136,7 @@ then
 
 	# parameters for optimization
 	lr_decay=10
-    	lr_adaptive=dann # none | loss | dann
+    	lr_adaptive=none # none | loss | dann
     	lr_steps_1=10
     	lr_steps_2=20
     	epochs=30
