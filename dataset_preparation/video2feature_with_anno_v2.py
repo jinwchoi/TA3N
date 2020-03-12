@@ -347,6 +347,8 @@ all_classes = []
 for row in data:
 	if 'ucf' in args.data_path or 'hmdb' in args.data_path:
 		cur_cls = row[0].split('/')[0]
+	elif 'kinetics' in args.data_path:
+		cur_cls = row[0].split('/')[1]
 	else:
 		cur_cls = row[0].split('/')[-3]
 	# class_names.append()
@@ -367,6 +369,8 @@ else:
 for k,v in data_dict_org.items():
 	if k in selected_classes:
 		data_dict[k] = v
+
+# pdb.set_trace()
 
 start = time.time()
 for class_name, val in data_dict.items():
