@@ -1,12 +1,12 @@
 #!/bin/bash -l
-#SBATCH --mem=125gb
-#SBATCH --gres=gpu:8
+#SBATCH --mem=32gb
+#SBATCH --gres=gpu:1
 #SBATCH --constraint="TITANX|TITANXP|GTX1080Ti"
 ##SBATCH --constraint="K80"
 #SBATCH --cpus-per-task 9
 #SBATCH --time 144:00:00
 #SBATCH -J i3d
-#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/ucf_hmdb_hmdb-train_val-i3d-feat_extraction_20200310.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/nec_drone/2018/log/ucf_hmdb_hmdb-train_val-i3d-feat_extraction_20200312_cls_11of12.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -19,15 +19,15 @@ which python
 data_path=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/hmdb_vids/ # depend on users: UCF: /net/acadia7a/data/public_datasets/UCF101/UCF-101/, HMDB: /net/acadia9a/data/jchoi/data/hmdb/videos/
 
 video_in=val
-feature_in=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/hmdb51/RGB-feature2
+feature_in=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/hmdb51/RGB-feature3
 input_type=video # video | frames
 structure=tsn # tsn | imagenet
 num_thread=8
-batch_size=150 # need to be larger than 16 for c3d
+batch_size=50 # need to be larger than 16 for c3d
 base_model=i3d # resnet101 | c3d
 pretrain_weight=/models/c3d.pickle # depend on users (only used for C3D model)
-start_class=1 # start from 1
-end_class=-1 # -1: process all the categories
+start_class=11 # start from 1
+end_class=11 # -1: process all the categories, inclusive
 class_file=/home/mai/jchoi/src/TA3N/data/classInd_hmdb_ucf.txt # none | XXX/class_list_DA.txt (depend on users)
 anno_file=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/hmdb_anno/anno_hmdb_full_val.txt 
 
@@ -42,11 +42,11 @@ feature_in=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/hmdb51/RGB-feature2
 input_type=video # video | frames
 structure=tsn # tsn | imagenet
 num_thread=8
-batch_size=150 # need to be larger than 16 for c3d
+batch_size=50 # need to be larger than 16 for c3d
 base_model=i3d # resnet101 | c3d
 pretrain_weight=/models/c3d.pickle # depend on users (only used for C3D model)
-start_class=1 # start from 1
-end_class=-1 # -1: process all the categories
+start_class=11 # start from 1
+end_class=11 # -1: process all the categories
 class_file=/home/mai/jchoi/src/TA3N/data/classInd_hmdb_ucf.txt # none | XXX/class_list_DA.txt (depend on users)
 anno_file=/net/acadia9a/data/jchoi/data/ucf_hmdb_full/hmdb_anno/anno_hmdb_full_train.txt 
 

@@ -37,9 +37,17 @@ parser.add_argument('--num_thread', type=int, required=False, default=-1, help='
 parser.add_argument('--batch_size', type=int, required=False, default=1, help='batch size')
 parser.add_argument('--start_class', type=int, required=False, default=1, help='the starting class id (start from 1)')
 parser.add_argument('--end_class', type=int, required=False, default=-1, help='the end class id')
+
+# parser.add_argument('--cur_shard', type=int, required=False, default=1, help='current shard out of total shard')
+# parser.add_argument('--total_shards', type=int, required=False, default=-1, help='total number of shards')
+
 parser.add_argument('--class_file', type=str, default='class.txt', help='process the classes only in the class_file')
 parser.add_argument('--anno_file', type=str, default=None, help='annotation file contains the path of each video')
 args = parser.parse_args()
+
+
+i3d_debug = False
+
 
 # Create thread pool
 max_thread = 8 # there are some issues if too many threads
@@ -88,12 +96,16 @@ elif args.base_model == 'i3d':
 	import pytorch_i3d as i3d
 	clip_size = 16
 	model = i3d.InceptionI3d()
+	# pdb.set_trace()
+	# tmp = model.state_dict()['Mixed_4d.b2b.conv3d.weight'].clone(	
 	model.load_state_dict(torch.load('/net/ca-home1/home/ma/grv/code/pytorch-i3d/models/rgb_imagenet.pt'))
 	
+	# pdb.set_trace()
 	list_model = list(model.children())
 	list_conv = list_model[3:]
 	list_fc = list_model[:1]
 
+	# not sure this way works
 	extractor_conv = nn.Sequential(*list_conv)
 	extractor_fc = nn.Sequential(*list_fc)
 
@@ -101,8 +113,15 @@ elif args.base_model == 'i3d':
 	extractor_conv.eval()
 	extractor_fc = torch.nn.DataParallel(extractor_fc.cuda())
 	extractor_fc.eval()
-	# model = torch.nn.DataParallel(model)
-	# model.eval()
+# elif args.base_model == 'i3d':
+# 	import pytorch_i3d as i3d
+# 	clip_size = 16
+# 	model = i3d.InceptionI3d(feat_extractor=True)
+# 	# pdb.set_trace()
+# 	# tmp = model.state_dict()['Mixed_4d.b2b.conv3d.weight'].clone(	
+# 	model.load_state_dict(torch.load('/net/ca-home1/home/ma/grv/code/pytorch-i3d/models/rgb_imagenet.pt'))
+# 	model = torch.nn.DataParallel(model.cuda())
+# 	model.eval()
 else:
 	model = getattr(models, args.base_model)(pretrained=True)
 	# remove the last layer
@@ -131,7 +150,8 @@ elif args.base_model == 'i3d':
 	data_transform = transforms.Compose([
 		transforms.Resize(256), 
 		transforms.CenterCrop(224),
-		transforms.ToTensor()
+		# SHOULD NOT RUN THIS for I3D
+		# transforms.ToTensor()
 		])
 else:
 	data_transform = transforms.Compose([
@@ -146,8 +166,12 @@ def im2tensor(im):
 	im = Image.fromarray(im) # convert numpy array to PIL image
 	t_im = data_transform(im) # Create a PyTorch Variable with the transformed image
 	# if the backbone is i3d, normalize to [-1, 1]
+	
 	if args.base_model == 'i3d':
-		t_im = (t_im/255.)*2 - 1
+		t_im = (np.array(t_im)/255.)*2 - 1
+		t_im = torch.Tensor(t_im) # -> HxWxC
+		t_im = t_im.permute([2,0,1])
+		
 	return t_im
 
 def extract_frame_feature_batch(list_tensor):
@@ -156,6 +180,14 @@ def extract_frame_feature_batch(list_tensor):
 		features_list = []
 		for batch_tensor in batch_tensor_list:
 			batch_tensor = Variable(batch_tensor).cuda() # Create a PyTorch Variable
+			
+			# pdb.set_trace()
+			# # tmp  = model(batch_tensor[:2]) 
+			# features_conv = extractor_conv(batch_tensor[:2])
+			# tmp = extractor_fc(features_conv)
+			# prev = torch.load('/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/ucf101/RGB-feature2_i3d/Fencing/v_Fencing_g07_c01/img_00001.t7')
+			# np.linalg.norm((tmp[0].squeeze().cpu()-prev).numpy()) 
+
 			# features = model.extract_features(batch_tensor)
 			features_conv = extractor_conv(batch_tensor)
 			cur_features = extractor_fc(features_conv)
@@ -212,6 +244,7 @@ def extract_features(video_file):
 	if args.input_type == 'video':
 		tmp = video_file.split('/')
 		
+		# the frame read is RGB
 		if 'ucf' in args.data_path or 'hmdb' in args.data_path:
 			reader = imageio.get_reader(path_input + '/' + tmp[0] + '/' + tmp[1]+'.avi')
 		else:
@@ -245,7 +278,7 @@ def extract_features(video_file):
 	if num_frames == num_exist_files: # skip if the features are already saved
 		print('Features already exist: {}'.format(path_output + video_name))
 		return
-	
+
 	# zeropad the beginning and the end of the video 
 	zero_padding = torch.zeros_like(torch.stack(frames_tensor)[:int(clip_size/2)])
 	frames_batch = torch.cat([zero_padding, torch.stack(frames_tensor), zero_padding], dim=0)
@@ -268,7 +301,17 @@ def extract_features(video_file):
 	# 	features = torch.cat((features,features_batch))
 
 	# features = features[:num_frames] # remove the dummy part
-	
+
+
+	if i3d_debug:
+		writer = imageio.get_writer('/net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/UCF/dbg/test.mp4', fps=25)
+		for frame in frames_batch:
+			# pdb.set_trace()
+			writer.append_data(frame.permute([1,2,0]).numpy().astype(np.uint8))
+		writer.close()
+		pdb.set_trace()
+
+
 	features_batch = extract_frame_feature_batch(frames_batch)
 
 	assert features_batch.shape[0] == num_frames
@@ -299,49 +342,61 @@ if args.anno_file is not None:
     data = df.to_numpy()
 
 class_names = []
-data_dict = {}
+data_dict_org = {}
+all_classes = []
 for row in data:
 	if 'ucf' in args.data_path or 'hmdb' in args.data_path:
 		cur_cls = row[0].split('/')[0]
 	else:
 		cur_cls = row[0].split('/')[-3]
 	# class_names.append()
-	if cur_cls not in data_dict:
-		data_dict[cur_cls] = []
-	data_dict[cur_cls].append(row[0])
+	if cur_cls not in data_dict_org:
+		data_dict_org[cur_cls] = []
+	data_dict_org[cur_cls].append(row[0])
+	if cur_cls not in all_classes:
+		all_classes.append(cur_cls)
 
 # class_names_proc = np.unique(np.array(class_names))
 
-
-# start = time.time()
-# for class_name, val in data_dict.items():
-# 	start_class = time.time()
-# 	for cur_val in val:
-# 		start_vid = time.time()
-# 		extract_features(cur_val)
-# 		# pdb.set_trace()
-# 		# pool.map(extract_features, val, chunksize=1)
-# 		end_vid = time.time()
-# 		print('Elapsed time for ' + cur_val + ': ' + str(end_vid-start_vid))
-# 	end_class = time.time()
-# 	print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
-
-# end = time.time()
-# print('Total elapsed time: ' + str(end-start))
-# print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
-
+# filter out classes
+data_dict = {}
+if  args.end_class == -1:
+	selected_classes = all_classes[args.start_class:]
+else:
+	selected_classes = all_classes[args.start_class:args.end_class+1]
+for k,v in data_dict_org.items():
+	if k in selected_classes:
+		data_dict[k] = v
 
 start = time.time()
 for class_name, val in data_dict.items():
 	start_class = time.time()
-	# extract_features(val[0])
-
-	# pdb.set_trace()
-	pool.map(extract_features, val, chunksize=1)
-
+	for cur_val in val:
+		start_vid = time.time()
+		extract_features(cur_val)
+		# pdb.set_trace()
+		# pool.map(extract_features, val, chunksize=1)
+		end_vid = time.time()
+		print('Elapsed time for ' + cur_val + ': ' + str(end_vid-start_vid))
 	end_class = time.time()
 	print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
 
 end = time.time()
 print('Total elapsed time: ' + str(end-start))
 print(Fore.GREEN + 'All the features are generated for ' + args.video_in)
+
+
+# start = time.time()
+# for class_name, val in data_dict.items():
+# 	start_class = time.time()
+# 	# extract_features(val[0])
+
+# 	# pdb.set_trace()
+# 	pool.map(extract_features, val, chunksize=1)
+
+# 	end_class = time.time()
+# 	print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))
+
+# end = time.time()
+# print('Total elapsed time: ' + str(end-start))
+# print(Fore.GREEN + 'All the features are generated for ' + args.video_in)

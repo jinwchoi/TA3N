@@ -10,7 +10,7 @@ import torch.optim
 from torch.nn.utils import clip_grad_norm_
 
 from dataset import TSNDataSet
-from models import VideoModel
+from models_dbg import VideoModel
 from loss import *
 from opts import parser
 from utils.utils import randSelectBatch
@@ -240,12 +240,8 @@ def main():
 			adjust_learning_rate(optimizer, args.lr_decay)
 
 		# train for one epoch
-		loss_c, attn_epoch_source, attn_epoch_target = train(num_class, source_loader, target_loader, model, criterion, criterion_domain, optimizer, epoch, train_file, train_short_file, alpha, beta, gamma, mu)
+		loss_c = train(num_class, source_loader, target_loader, model, criterion, criterion_domain, optimizer, epoch, train_file, train_short_file, alpha, beta, gamma, mu)
 		
-		if args.save_attention >= 0:
-			attn_source_all = torch.cat((attn_source_all, attn_epoch_source.unsqueeze(0)))  # save the attention values
-			attn_target_all = torch.cat((attn_target_all, attn_epoch_target.unsqueeze(0)))  # save the attention values
-
 		# update the recorded loss_c
 		loss_c_previous = loss_c_current
 		loss_c_current = loss_c
@@ -321,11 +317,6 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 	top1 = AverageMeter()
 	top5 = AverageMeter()
 
-	if args.no_partialbn:
-		model.module.partialBN(False)
-	else:
-		model.module.partialBN(True)
-
 	# switch to train mode
 	model.train()
 
@@ -336,20 +327,11 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 	start_steps = epoch * len(source_loader)
 	total_steps = args.epochs * len(source_loader)
 
-	# initialize the embedding
-	if args.tensorboard:
-		feat_source_display = None
-		label_source_display = None
-		label_source_domain_display = None
-
-		feat_target_display = None
-		label_target_display = None
-		label_target_domain_display = None
-
 	attn_epoch_source = torch.Tensor()
 	attn_epoch_target = torch.Tensor()
 	for i, ((source_data, source_label),(target_data, target_label)) in data_loader:
 		# pdb.set_trace()
+		source_data = source_data[:,1,:]
 		# debugging with dummy data
 		# source_data = source_data.repeat([1,1,2]) 
 		# target_data = target_data.repeat([1,1,2]) 
@@ -367,19 +349,13 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 		batch_target_ori = target_size_ori[0]
 		# add dummy tensors to keep the same batch size for each epoch (for the last epoch)
 		if batch_source_ori < args.batch_size[0]:
-			source_data_dummy = torch.zeros(args.batch_size[0] - batch_source_ori, source_size_ori[1], source_size_ori[2])
+			source_data_dummy = torch.zeros(args.batch_size[0] - batch_source_ori, source_size_ori[1])
 			source_data = torch.cat((source_data, source_data_dummy))
-		if batch_target_ori < args.batch_size[1]:
-			target_data_dummy = torch.zeros(args.batch_size[1] - batch_target_ori, target_size_ori[1], target_size_ori[2])
-			target_data = torch.cat((target_data, target_data_dummy))
 
 		# add dummy tensors to make sure batch size can be divided by gpu #
 		if source_data.size(0) % gpu_count != 0:
-			source_data_dummy = torch.zeros(gpu_count - source_data.size(0) % gpu_count, source_data.size(1), source_data.size(2))
+			source_data_dummy = torch.zeros(gpu_count - source_data.size(0) % gpu_count, source_data.size(1))
 			source_data = torch.cat((source_data, source_data_dummy))
-		if target_data.size(0) % gpu_count != 0:
-			target_data_dummy = torch.zeros(gpu_count - target_data.size(0) % gpu_count, target_data.size(1), target_data.size(2))
-			target_data = torch.cat((target_data, target_data_dummy))
 
 		# measure data loading time
 		data_time.update(time.time() - end)
@@ -394,195 +370,22 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 		label_source = source_label_frame if args.baseline_type == 'frame' else source_label  # determine the label for calculating the loss function
 		label_target = target_label_frame if args.baseline_type == 'frame' else target_label
 
-		#====== pre-train source data ======#
-		if args.pretrain_source:
-			#------ forward pass data again ------#
-			_, out_source, out_source_2, _, _, _, _, _, _, _ = model(source_data, target_data, beta, mu, is_train=True, reverse=False)
-
-			# ignore dummy tensors
-			out_source = out_source[:batch_source_ori]
-			out_source_2 = out_source_2[:batch_source_ori]
-
-			#------ calculate the loss function ------#
-			# 1. calculate the classification loss
-			out = out_source
-			label = label_source
-
-			loss = criterion(out, label)
-			if args.ens_DA == 'MCD' and args.use_target != 'none':
-				loss += criterion(out_source_2, label)
-
-			# compute gradient and do SGD step
-			optimizer.zero_grad()
-			loss.backward()
-
-			if args.clip_gradient is not None:
-				total_norm = clip_grad_norm_(model.parameters(), args.clip_gradient)
-				if total_norm > args.clip_gradient and args.verbose:
-					print("clipping gradient: {} with coef {}".format(total_norm, args.clip_gradient / total_norm))
-
-			optimizer.step()
-
-
-		#====== forward pass data ======#
-		attn_source, out_source, out_source_2, pred_domain_source, feat_source, attn_target, out_target, out_target_2, pred_domain_target, feat_target = model(source_data, target_data, beta, mu, is_train=True, reverse=False)
+		#------ forward pass data again ------#
+		out_source = model(source_data)
 
 		# ignore dummy tensors
-		attn_source, out_source, out_source_2, pred_domain_source, feat_source = removeDummy(attn_source, out_source, out_source_2, pred_domain_source, feat_source, batch_source_ori)
-		attn_target, out_target, out_target_2, pred_domain_target, feat_target = removeDummy(attn_target, out_target, out_target_2, pred_domain_target, feat_target, batch_target_ori)
+		out_source = out_source[:batch_source_ori]
 
-		if args.pred_normalize == 'Y': # use the uncertainly method (in contruction...)
-			out_source = out_source / out_source.var().log()
-			out_target = out_target / out_target.var().log()
-
-		# store the embedding
-		if args.tensorboard:
-			feat_source_display = feat_source[1] if i==0 else torch.cat((feat_source_display, feat_source[1]), 0)
-			label_source_display = label_source if i==0 else torch.cat((label_source_display, label_source), 0)
-			label_source_domain_display = torch.zeros(label_source.size(0)) if i==0 else torch.cat((label_source_domain_display, torch.zeros(label_source.size(0))), 0)
-			feat_target_display = feat_target[1] if i==0 else torch.cat((feat_target_display, feat_target[1]), 0)
-			label_target_display = label_target if i==0 else torch.cat((label_target_display, label_target), 0)
-			label_target_domain_display = torch.ones(label_target.size(0)) if i==0 else torch.cat((label_target_domain_display, torch.ones(label_target.size(0))), 0)
-
-		#====== calculate the loss function ======#
+		#------ calculate the loss function ------#
 		# 1. calculate the classification loss
 		out = out_source
 		label = label_source
 
-		if args.use_target == 'Sv':
-			out = torch.cat((out, out_target))
-			label = torch.cat((label, label_target))
-
-		loss_classification = criterion(out, label)
-		if args.ens_DA == 'MCD' and args.use_target != 'none':
-			loss_classification += criterion(out_source_2, label)
-
-		losses_c.update(loss_classification.item(), out_source.size(0)) # pytorch 0.4.X
-		loss = loss_classification
-
-		# 2. calculate the loss for DA
-		# (I) discrepancy-based approach: discrepancy loss
-		if args.dis_DA != 'none' and args.use_target != 'none':
-			loss_discrepancy = 0
-
-			kernel_muls = [2.0]*2
-			kernel_nums = [2, 5]
-			fix_sigma_list = [None]*2
-
-			if args.dis_DA == 'JAN':
-				# ignore the features from shared layers
-				feat_source_sel = feat_source[:-args.add_fc]
-				feat_target_sel = feat_target[:-args.add_fc]
-
-				size_loss = min(feat_source_sel[0].size(0), feat_target_sel[0].size(0))  # choose the smaller number
-				feat_source_sel = [feat[:size_loss] for feat in feat_source_sel]
-				feat_target_sel = [feat[:size_loss] for feat in feat_target_sel]
-
-				loss_discrepancy += JAN(feat_source_sel, feat_target_sel, kernel_muls=kernel_muls, kernel_nums=kernel_nums, fix_sigma_list=fix_sigma_list, ver=2)
-
-			else:
-				# extend the parameter list for shared layers
-				kernel_muls.extend([kernel_muls[-1]]*args.add_fc)
-				kernel_nums.extend([kernel_nums[-1]]*args.add_fc)
-				fix_sigma_list.extend([fix_sigma_list[-1]]*args.add_fc)
-
-				for l in range(0, args.add_fc + 2):  # loss from all the features (+2 because of frame-aggregation layer + final fc layer)
-					if args.place_dis[l] == 'Y':
-						# select the data for calculating the loss (make sure source # == target #)
-						size_loss = min(feat_source[l].size(0), feat_target[l].size(0)) # choose the smaller number
-						# select
-						feat_source_sel = feat_source[l][:size_loss]
-						feat_target_sel = feat_target[l][:size_loss]
-
-						# break into multiple batches to avoid "out of memory" issue
-						size_batch = min(256,feat_source_sel.size(0))
-						feat_source_sel = feat_source_sel.view((-1,size_batch) + feat_source_sel.size()[1:])
-						feat_target_sel = feat_target_sel.view((-1,size_batch) + feat_target_sel.size()[1:])
-
-						if args.dis_DA == 'CORAL':
-							losses_coral = [CORAL(feat_source_sel[t], feat_target_sel[t]) for t in range(feat_source_sel.size(0))]
-							loss_coral = sum(losses_coral)/len(losses_coral)
-							loss_discrepancy += loss_coral
-						elif args.dis_DA == 'DAN':
-							losses_mmd = [mmd_rbf(feat_source_sel[t], feat_target_sel[t], kernel_mul=kernel_muls[l], kernel_num=kernel_nums[l], fix_sigma=fix_sigma_list[l], ver=2) for t in range(feat_source_sel.size(0))]
-							loss_mmd = sum(losses_mmd) / len(losses_mmd)
-
-							loss_discrepancy += loss_mmd
-						else:
-							raise NameError('not in dis_DA!!!')
-
-			losses_d.update(loss_discrepancy.item(), feat_source[0].size(0))
-			loss += alpha * loss_discrepancy
-
-		# (II) adversarial discriminative model: adversarial loss
-		if args.adv_DA != 'none' and args.use_target != 'none':
-			loss_adversarial = 0
-			pred_domain_all = []
-			pred_domain_target_all = []
-
-			for l in range(len(args.place_adv)):
-				if args.place_adv[l] == 'Y':
-
-					# reshape the features (e.g. 128x5x2 --> 640x2)
-					pred_domain_source_single = pred_domain_source[l].view(-1, pred_domain_source[l].size()[-1])
-					pred_domain_target_single = pred_domain_target[l].view(-1, pred_domain_target[l].size()[-1])
-
-					# prepare domain labels
-					source_domain_label = torch.zeros(pred_domain_source_single.size(0)).long()
-					target_domain_label = torch.ones(pred_domain_target_single.size(0)).long()
-					domain_label = torch.cat((source_domain_label,target_domain_label),0)
-
-					domain_label = domain_label.cuda(non_blocking=True)
-
-					pred_domain = torch.cat((pred_domain_source_single, pred_domain_target_single),0)
-					pred_domain_all.append(pred_domain)
-					pred_domain_target_all.append(pred_domain_target_single)
-
-					if args.pred_normalize == 'Y':  # use the uncertainly method (in construction......)
-						pred_domain = pred_domain / pred_domain.var().log()
-					loss_adversarial_single = criterion_domain(pred_domain, domain_label)
-
-					loss_adversarial += loss_adversarial_single
-
-			losses_a.update(loss_adversarial.item(), pred_domain.size(0))
-			loss += loss_adversarial
-
-		# (III) other loss
-		# 1. entropy loss for target data
-		if args.add_loss_DA == 'target_entropy' and args.use_target != 'none':
-			loss_entropy = cross_entropy_soft(out_target)
-			losses_e.update(loss_entropy.item(), out_target.size(0))
-			loss += gamma * loss_entropy
-
-		# 2. discrepancy loss for MCD (CVPR 18)
-		if args.ens_DA == 'MCD' and args.use_target != 'none':
-			_, _, _, _, _, attn_target, out_target, out_target_2, pred_domain_target, feat_target = model(source_data, target_data, beta, mu, is_train=True, reverse=True)
-
-			# ignore dummy tensors
-			_, out_target, out_target_2, _, _ = removeDummy(attn_target, out_target, out_target_2, pred_domain_target, feat_target, batch_target_ori)
-
-			loss_dis = -dis_MCD(out_target, out_target_2)
-			losses_s.update(loss_dis.item(), out_target.size(0))
-			loss += loss_dis
-
-		# 3. attentive entropy loss
-		if args.add_loss_DA == 'attentive_entropy' and args.use_attn != 'none' and args.use_target != 'none':
-			loss_entropy = attentive_entropy(torch.cat((out_source, out_target),0), pred_domain_all[1])
-			losses_e.update(loss_entropy.item(), out_target.size(0))
-			loss += gamma * loss_entropy
-
-		# measure accuracy and record loss
-		pred = out
-
-		prec1, prec5 = accuracy(pred.data, label, topk=(1, 5))
-
-		losses.update(loss.item())
-		top1.update(prec1.item(), out_source.size(0))
-		top5.update(prec5.item(), out_source.size(0))
+		# pdb.set_trace()
+		loss = criterion(out, label)
 
 		# compute gradient and do SGD step
 		optimizer.zero_grad()
-
 		loss.backward()
 
 		if args.clip_gradient is not None:
@@ -591,10 +394,15 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 				print("clipping gradient: {} with coef {}".format(total_norm, args.clip_gradient / total_norm))
 
 		optimizer.step()
+		
+		pred = out
 
-		# measure elapsed time
-		batch_time.update(time.time() - end)
-		end = time.time()
+		prec1, prec5 = accuracy(pred.data, label, topk=(1, 5))
+
+		losses.update(loss.item())
+		top1.update(prec1.item(), out_source.size(0))
+		top5.update(prec5.item(), out_source.size(0))
+		losses_c.update(loss.item(), out_source.size(0)) # pytorch 0.4.X
 
 		if i % args.print_freq == 0:
 			line = 'Train: [{0}][{1}/{2}], lr: {lr:.5f}\t' + \
@@ -604,21 +412,9 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 				   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})\t' + \
 				   'Loss {loss.val:.4f} ({loss.avg:.4f})   loss_c {loss_c.avg:.4f}\t'
 
-			if args.dis_DA != 'none' and args.use_target != 'none':
-				line += 'alpha {alpha:.3f}  loss_d {loss_d.avg:.4f}\t'
-
-			if args.adv_DA != 'none' and args.use_target != 'none':
-				line += 'beta {beta[0]:.3f}, {beta[1]:.3f}, {beta[2]:.3f}  loss_a {loss_a.avg:.4f}\t'
-
-			if args.add_loss_DA != 'none' and args.use_target != 'none':
-				line += 'gamma {gamma:.6f}  loss_e {loss_e.avg:.4f}\t'
-
-			if args.ens_DA != 'none' and args.use_target != 'none':
-				line += 'mu {mu:.6f}  loss_s {loss_s.avg:.4f}\t'
-
 			line = line.format(
 				epoch, i, len(source_loader), batch_time=batch_time, data_time=data_time, alpha=alpha, beta=beta, gamma=gamma, mu=mu,
-				loss=losses, loss_c=losses_c, loss_d=losses_d, loss_a=losses_a, loss_e=losses_e, loss_s=losses_s, top1=top1, top5=top5,
+				loss=losses, loss_c=losses_c, top1=top1, top5=top5,
 				lr=optimizer.param_groups[0]['lr'])
 
 			if i % args.show_freq == 0:
@@ -626,55 +422,7 @@ def train(num_class, source_loader, target_loader, model, criterion, criterion_d
 
 			log.write('%s\n' % line)
 
-		# adjust the learning rate for ech step (e.g. DANN)
-		if args.lr_adaptive == 'dann':
-			adjust_learning_rate_dann(optimizer, p)
-
-		# save attention values w/ the selected class
-		if args.save_attention >= 0:
-			attn_source = attn_source[source_label==args.save_attention]
-			attn_target = attn_target[target_label==args.save_attention]
-			attn_epoch_source = torch.cat((attn_epoch_source, attn_source.cpu()))
-			attn_epoch_target = torch.cat((attn_epoch_target, attn_target.cpu()))
-
-	# update the embedding every epoch
-	if args.tensorboard:
-		n_iter_train = epoch * len(source_loader) # calculate the total iteration
-		# embedding
-		# see source and target separately
-		writer.add_embedding(feat_source_display, metadata=label_source_display.data, global_step=n_iter_train, tag='train_source')
-		writer.add_embedding(feat_target_display, metadata=label_target_display.data, global_step=n_iter_train, tag='train_target')
-
-		# mix source and target
-		feat_all_display = torch.cat((feat_source_display, feat_target_display), 0)
-		label_all_domain_display = torch.cat((label_source_domain_display, label_target_domain_display), 0)
-		writer.add_embedding(feat_all_display, metadata=label_all_domain_display.data, global_step=n_iter_train, tag='train_DA')
-
-		# emphazise some classes (1, 3, 11 here)
-		label_source_1 = 1 * torch.eq(label_source_display, torch.cuda.LongTensor([1]).repeat(label_source_display.size(0))).long().cuda(non_blocking=True)
-		label_source_3 = 2 * torch.eq(label_source_display, torch.cuda.LongTensor([3]).repeat(label_source_display.size(0))).long().cuda(non_blocking=True)
-		label_source_11 = 3 * torch.eq(label_source_display, torch.cuda.LongTensor([11]).repeat(label_source_display.size(0))).long().cuda(non_blocking=True)
-
-		label_target_1 = 4 * torch.eq(label_target_display, torch.cuda.LongTensor([1]).repeat(label_target_display.size(0))).long().cuda(non_blocking=True)
-		label_target_3 = 5 * torch.eq(label_target_display, torch.cuda.LongTensor([3]).repeat(label_target_display.size(0))).long().cuda(non_blocking=True)
-		label_target_11 = 6 * torch.eq(label_target_display, torch.cuda.LongTensor([11]).repeat(label_target_display.size(0))).long().cuda(non_blocking=True)
-
-		label_source_display_new = label_source_1 + label_source_3 + label_source_11
-		id_source_show = ~torch.eq(label_source_display_new, 0).cuda(non_blocking=True)
-		label_source_display_new = label_source_display_new[id_source_show]
-		feat_source_display_new = feat_source_display[id_source_show]
-
-		label_target_display_new = label_target_1 + label_target_3 + label_target_11
-		id_target_show = ~torch.eq(label_target_display_new, 0).cuda(non_blocking=True)
-		label_target_display_new = label_target_display_new[id_target_show]
-		feat_target_display_new = feat_target_display[id_target_show]
-
-		feat_all_display_new = torch.cat((feat_source_display_new, feat_target_display_new), 0)
-		label_all_display_new = torch.cat((label_source_display_new, label_target_display_new), 0)
-		writer.add_embedding(feat_all_display_new, metadata=label_all_display_new.data, global_step=n_iter_train, tag='train_DA_labels')
-
-	log_short.write('%s\n' % line)
-	return losses_c.avg, attn_epoch_source.mean(0), attn_epoch_target.mean(0)
+	return losses_c.avg
 
 def validate(val_loader, model, criterion, num_class, epoch, log):
 	batch_time = AverageMeter()
@@ -719,18 +467,13 @@ def validate(val_loader, model, criterion, num_class, epoch, log):
 				val_label_frame = val_label.unsqueeze(1).repeat(1,args.num_segments).view(-1) # expand the size for all the frames
 
 			# compute output
-			_, _, _, _, _, attn_val, out_val, out_val_2, pred_domain_val, feat_val = model(val_data, val_data, [0]*len(args.beta), 0, is_train=False, reverse=False)
+			out_val = model(val_data[:,1,:])
 
 			# ignore dummy tensors
-			attn_val, out_val, out_val_2, pred_domain_val, feat_val = removeDummy(attn_val, out_val, out_val_2, pred_domain_val, feat_val, batch_val_ori)
+			out_val = removeDummy(out_val, batch_val_ori)
 
 			# measure accuracy and record loss
 			label = val_label_frame if args.baseline_type == 'frame' else val_label
-
-			# store the embedding
-			if args.tensorboard:
-				feat_val_display = feat_val[1] if i == 0 else torch.cat((feat_val_display, feat_val[1]), 0)
-				label_val_display = label if i == 0 else torch.cat((label_val_display, label), 0)
 
 			pred = out_val
 
@@ -837,14 +580,9 @@ def accuracy(output, target, topk=(1,)):
 	return res
 
 # remove dummy tensors
-def removeDummy(attn, out_1, out_2, pred_domain, feat, batch_size):
-	attn = attn[:batch_size]
+def removeDummy(out_1, batch_size):
 	out_1 = out_1[:batch_size]
-	out_2 = out_2[:batch_size]
-	pred_domain = [pred[:batch_size] for pred in pred_domain]
-	feat = [f[:batch_size] for f in feat]
-
-	return attn, out_1, out_2, pred_domain, feat
+	return out_1
 
 if __name__ == '__main__':
 	main()

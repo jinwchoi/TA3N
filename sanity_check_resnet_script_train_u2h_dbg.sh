@@ -7,13 +7,13 @@ training=true # true | false
 testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
-num_segments=5 # sample frame # of each video for training
-test_segments=5
+num_segments=3 # sample frame # of each video for training
+test_segments=3
 baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
 fc_dim=512
-arch=i3d
+arch=resnet101
 use_target=Sv # none | Sv | uSv
 share_params=Y # Y | N
 
@@ -25,16 +25,17 @@ else
 fi
 
 #====== select dataset ======#
-path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiment_h2u_tgt_only/ # depend on users
+path_data_root=dataset/ # depend on users
+path_exp_root=experiments/resnet101/action-experiment_u2h_tgt_only/ # depend on users
+# path_exp_root=experiments/i3d/action-experiment_u2u_tgt_only/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
-	dataset_source=hmdb51 # depend on users
-	dataset_target=ucf101 # depend on users
-	dataset_val=ucf101 # depend on users
-	num_source=840 # number of training data (source) 
-	num_target=1438 # number of training data (target)
+	dataset_source=ucf101 # depend on users
+	dataset_target=hmdb51 # depend on users
+	dataset_val=hmdb51 # depend on users
+	num_source=1438 # number of training data (source) 
+	num_target=840 # number of training data (target)
 
 	path_data_source=$path_data_root$dataset_source'/'
 	path_data_target=$path_data_root$dataset_target'/'
@@ -135,15 +136,15 @@ then
 	val_segments=$test_segments
 
 	# parameters for optimization
-	lr_decay=100
-    	lr_adaptive=none # none | loss | dann
-    	lr_steps_1=100
-    	lr_steps_2=200
+	lr_decay=10
+    	lr_adaptive=dann # none | loss | dann
+    	lr_steps_1=10
+    	lr_steps_2=20
     	epochs=300
 	gd=20
 	
 	#------ main command ------#
-	python main.py $class_file $modality $train_source_list $train_target_list $val_list --exp_path $exp_path \
+	python main_dbg.py $class_file $modality $train_source_list $train_target_list $val_list --exp_path $exp_path \
 	--arch $arch --pretrained $pretrained --baseline_type $baseline_type --frame_aggregation $frame_aggregation \
 	--num_segments $num_segments --val_segments $val_segments --add_fc $add_fc --fc_dim $fc_dim --dropout_i 0.5 --dropout_v 0.5 \
 	--use_target $use_target --share_params $share_params \
@@ -159,31 +160,31 @@ then
 
 fi
 
-if ($testing)
-then
-	model=model_best # checkpoint | model_best
-	echo $model
+# if ($testing)
+# then
+# 	model=model_best # checkpoint | model_best
+# 	echo $model
 
-	# testing on the validation set
-	echo 'testing on the validation set'
-	python test_models.py $class_file $modality \
-	$val_list $exp_path$modality'/'$model'.pth.tar' \
-	--arch $arch --test_segments $test_segments \
-	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+# 	# testing on the validation set
+# 	echo 'testing on the validation set'
+# 	python test_models.py $class_file $modality \
+# 	$val_list $exp_path$modality'/'$model'.pth.tar' \
+# 	--arch $arch --test_segments $test_segments \
+# 	--save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+# 	--n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+# 	--use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+# 	-j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 
-	# echo 'testing on the training set'
-	# python test_models.py $class_file $modality \
-	# $train_target_list $exp_path$modality'/'$model'.pth.tar' \
-	# --arch $arch --test_segments $test_segments \
-	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
-	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
-	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
-	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
+# 	# echo 'testing on the training set'
+# 	# python test_models.py $class_file $modality \
+# 	# $train_target_list $exp_path$modality'/'$model'.pth.tar' \
+# 	# --arch $arch --test_segments $test_segments \
+# 	# --save_scores $exp_path$modality'/scores_'$dataset_target'-'$model'-'$test_segments'seg' --save_confusion $exp_path$modality'/confusion_matrix_'$dataset_target'-'$model'-'$test_segments'seg' \
+# 	# --n_rnn 1 --rnn_cell LSTM --n_directions 1 --n_ts 5 \
+# 	# --use_attn $use_attn --n_attn $n_attn --use_attn_frame $use_attn_frame --use_bn $use_bn --share_params $share_params \
+# 	# -j 4 --bS 512 --top 1 3 5 --add_fc 1 --fc_dim $fc_dim --baseline_type $baseline_type --frame_aggregation $frame_aggregation 
 	
-fi
+# fi
 
 # ----------------------------------------------------------------------------------
 exit 0
