@@ -53,8 +53,8 @@ else:
 feature_in_type = '.t7'
 
 #--- create dataset folders
-path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
-# path_output = args.feature_in + '_' + args.base_model + '/' 
+# path_output = args.feature_in + '_dbg_' + args.base_model + '/' 
+path_output = args.feature_in + '_' + args.base_model + '/' 
 if args.structure != 'tsn':
 	path_output = args.feature_in + '-' + args.structure + '/'
 if not os.path.isdir(path_output):
@@ -195,16 +195,19 @@ def extract_features(video_file):
 	else:
 		video_name = '_'.join(video_file.split('/')[-4:])  
 	if args.structure == 'tsn':  # create the video folder if the data structure is TSN
-		if not os.path.isdir(path_output + video_name + '/'):
-			os.makedirs(path_output + video_name + '/')
+		if not os.path.isdir(path_output + video_name.split('/')[-1].split('.')[0] + '/'):
+			os.makedirs(path_output + video_name.split('/')[-1].split('.')[0] + '/')
+		# if not os.path.isdir(path_output + video_name + '/'):
+		# 	os.makedirs(path_output + video_name + '/')
 
-	num_exist_files = len(os.listdir(path_output + video_name + '/'))
+	num_exist_files = len(os.listdir(path_output + video_name.split('/')[-1].split('.')[0] + '/'))
+	# num_exist_files = len(os.listdir(path_output + video_name + '/'))
 
 	frames_tensor = []
 	# print(class_name)
 	if args.input_type == 'video':
 		tmp = video_file.split('/')
-		
+		# pdb.set_trace()
 		if 'ucf' in args.data_path or 'hmdb' in args.data_path:
 			reader = imageio.get_reader(path_input + '/' + tmp[0] + '/' + tmp[1]+'.avi')
 		else:
@@ -260,9 +263,11 @@ def extract_features(video_file):
 	for t in range(features.size(0)):
 		id_frame = t+1
 		id_frame_name = str(id_frame).zfill(5)
+		# pdb.set_trace()
 		if args.structure == 'tsn':
 			# pdb.set_trace()
-			filename = path_output + video_name + '/' + 'img_' + id_frame_name + feature_in_type
+			# filename = path_output + video_name + '/' + 'img_' + id_frame_name + feature_in_type
+			filename = path_output + video_name.split('/')[-1].split('.')[0] + '/' + 'img_' + id_frame_name + feature_in_type
 		elif args.structure == 'imagenet':
 			filename = path_output + class_name + '/' + video_name + '_' + id_frame_name + feature_in_type
 		else:
@@ -297,9 +302,9 @@ start = time.time()
 for class_name, val in data_dict.items():
 	start_class = time.time()
 	if 1:
-		extract_features(val[0])
+		# extract_features(val[0])
 
-		# pool.map(extract_features, val, chunksize=1)
+		pool.map(extract_features, val, chunksize=1)
 
 		end_class = time.time()
 		print('Elapsed time for ' + class_name + ': ' + str(end_class-start_class))

@@ -156,7 +156,10 @@ def main():
 	num_target_train = round(num_max_iter*args.batch_size[1]) if args.copy_list[1] == 'Y' else num_target
 
 	# calculate the weight for each class
-	class_id_list = [int(line.strip().split(' ')[2]) for line in open(args.train_source_list)]
+	if 'kinetics' in args.train_source_list:
+		class_id_list = [int(line.strip().split(' ')[-1]) for line in open(args.train_source_list)]
+	else:
+		class_id_list = [int(line.strip().split(' ')[2]) for line in open(args.train_source_list)]
 	class_id, class_data_counts = np.unique(np.array(class_id_list), return_counts=True)
 	class_freq = (class_data_counts / class_data_counts.sum()).tolist()
 

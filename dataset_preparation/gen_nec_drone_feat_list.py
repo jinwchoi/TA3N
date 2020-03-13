@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 import pdb
 
-phase = 'val' # 'train' or 'val' or 'test'
-necdrone_feature_dir = '/net/acadia9a/data/jchoi/data/nec_drone/2018/TA3N/RGB-feature_resnet101'
+phase = 'test' # 'train' or 'val' or 'test'
+necdrone_feature_dir = '/net/acadia9a/data/jchoi/data/nec_drone/2018/TA3N/RGB-feature3_i3d'
 necdrone_anno_path = '/net/acadia7a/data/jchoi/NEC-Drone/Annotation/NEC-Drone-7_Annotation_10102018_{}list.csv'.format(phase)
 classfile_path = '/net/acadia9a/data/jchoi/data/kinetics/anno/K7-ND7-classes.txt'
-output_anno_path = '/home/mai/jchoi/src/TA3N/dataset/necdrone/list_necdrone_{}_kinetics_necdrone-feature.txt'.format(phase)
+output_anno_path = '/home/mai/jchoi/src/TA3N/dataset_i3d/necdrone/list_necdrone_{}_kinetics_necdrone-feature.txt'.format(phase)
 
 df = pd.read_csv(necdrone_anno_path, header=None)
 data = df.to_numpy()
@@ -37,7 +37,8 @@ for i,anno in enumerate(data):
 	if cur_num_frames_anno != len(featfile_list):
 		not_identical_vid_ids.append(cur_id)
 
-	cur_output_anno = 'dataset/necdrone/RGB-feature_resnet/' + cur_id  + ' {} {}'.format(len(featfile_list), cur_label)
+	# cur_output_anno = necdrone_feature_dir + '/' + cur_id  + ' {} {}'.format(len(featfile_list), cur_label)
+	cur_output_anno = 'dataset/necdrone/RGB-feature_i3d/' + cur_id  + ' {} {}'.format(len(featfile_list), cur_label)
 	output_anno.append(cur_output_anno)
 
 output_anno = np.array(output_anno)
