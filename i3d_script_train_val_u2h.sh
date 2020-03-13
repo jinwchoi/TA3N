@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task 5
 #SBATCH --time 144:00:00
 #SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/ucf2hmdb-i3d_uda_TA3N_20200312.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/ucf2hmdb-i3d_uda_TA2N_20200312_num_seg_3.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -23,8 +23,8 @@ training=true # true | false
 testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
-num_segments=5 # sample frame # of each video for training
-test_segments=5
+num_segments=3 # sample frame # of each video for training
+test_segments=3
 baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
@@ -42,7 +42,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiments_u2h_uda_TA3N/ # depend on users
+path_exp_root=experiments/i3d/action-experiments_u2h_uda_TA2N/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
@@ -97,7 +97,7 @@ beta_0=0.75 # depend on users
 beta_1=0.75 # depend on users
 beta_2=0.5 # depend on users
 
-use_attn=TransAttn # none | TransAttn | general
+use_attn=none # none | TransAttn | general
 n_attn=1
 use_attn_frame=none # none | TransAttn | general
 

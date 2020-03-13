@@ -35,12 +35,11 @@ parser.add_argument('--base_model', type=str, required=False, default='resnet101
 parser.add_argument('--pretrain_weight', type=str, required=False, default='', help='model weight file path')
 parser.add_argument('--num_thread', type=int, required=False, default=-1, help='number of threads for multiprocessing')
 parser.add_argument('--batch_size', type=int, required=False, default=1, help='batch size')
-parser.add_argument('--start_class', type=int, required=False, default=1, help='the starting class id (start from 1)')
+parser.add_argument('--start_class', type=int, required=False, default=0, help='the starting class id (start from 1)')
 parser.add_argument('--end_class', type=int, required=False, default=-1, help='the end class id')
-
-# parser.add_argument('--cur_shard', type=int, required=False, default=1, help='current shard out of total shard')
-# parser.add_argument('--total_shards', type=int, required=False, default=-1, help='total number of shards')
-
+parser.add_argument('--cur_shard', type=int, required=False, default=0, help='current shard out of total shard')
+parser.add_argument('--total_shards', type=int, required=False, default=1, help='total number of shards')
+parser.add_argument('--shard_start_idx', type=int, required=False, default=1, help='start index')
 parser.add_argument('--class_file', type=str, default='class.txt', help='process the classes only in the class_file')
 parser.add_argument('--anno_file', type=str, default=None, help='annotation file contains the path of each video')
 args = parser.parse_args()
@@ -373,7 +372,16 @@ for k,v in data_dict_org.items():
 # pdb.set_trace()
 
 start = time.time()
-for class_name, val in data_dict.items():
+for class_name, v in data_dict.items():
+	if args.total_shards == 1:
+		val = v
+	else:
+		v = v[args.shard_start_idx:]
+		num_per_shard = int(np.floor(len(v)/args.total_shards))
+		if args.cur_shard == args.total_shards-1:
+			val = v[num_per_shard*args.cur_shard:]
+		else:
+			val = v[num_per_shard*args.cur_shard:num_per_shard*(args.cur_shard+1)]
 	start_class = time.time()
 	for cur_val in val:
 		start_vid = time.time()

@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task 5
 #SBATCH --time 144:00:00
 #SBATCH -J resnet101
-#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/hmdb2ucf-i3d_src_only_20200312.log
+#SBATCH -o /net/acadia9a/data/jchoi/data/ucf_hmdb_full/TA3N/log/hmdb2ucf-i3d_uda_TA3N_20200312_num_seg_4.log
 
 pwd; hostname; date
 echo $CUDA_VISIBLE_DEVICES
@@ -23,14 +23,14 @@ training=true # true | false
 testing=true # true | false
 modality=RGB 
 frame_type=feature # frame | feature
-num_segments=5 # sample frame # of each video for training
-test_segments=5
+num_segments=4 # sample frame # of each video for training
+test_segments=4
 baseline_type=video
 frame_aggregation=trn-m # method to integrate the frame-level features (avgpool | trn | trn-m | rnn | temconv)
 add_fc=1
 fc_dim=512
 arch=i3d
-use_target=none # none | Sv | uSv
+use_target=uSv # none | Sv | uSv
 share_params=Y # Y | N
 
 if [ "$use_target" == "none" ] 
@@ -42,7 +42,7 @@ fi
 
 #====== select dataset ======#
 path_data_root=dataset_i3d/ # depend on users
-path_exp_root=experiments/i3d/action-experiment_h2u_src_only/ # depend on users
+path_exp_root=experiments/i3d/action-experiment_h2u_uda_TA3N/ # depend on users
 
 if [ "$dataset" == "hmdb_ucf" ] || [ "$dataset" == "hmdb_ucf_small" ] ||[ "$dataset" == "ucf_olympic" ]
 then
